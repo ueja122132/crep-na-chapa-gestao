@@ -119,11 +119,11 @@ export default function OrderTerminal() {
 
       {/* Cart / Checkout */}
       <div className="lg:col-span-1">
-        <div className="bg-white rounded-2xl shadow-lg border border-stone-200 flex flex-col h-[calc(100vh-12rem)] sticky top-24">
-          <div className="p-6 border-b border-stone-100">
+        <div className="bg-white rounded-2xl shadow-xl border border-stone-200 flex flex-col h-[calc(100vh-7rem)] sticky top-24">
+          <div className="p-4 border-b border-stone-100 bg-stone-50/50 rounded-t-2xl">
             <div className="flex items-center gap-2 mb-4">
               <ShoppingCart className="w-5 h-5 text-orange-500" />
-              <h2 className="text-lg font-bold">Resumo do Pedido</h2>
+              <h2 className="text-base font-black text-stone-800">Resumo do Pedido</h2>
             </div>
             <div className="relative">
               <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
@@ -184,10 +184,10 @@ export default function OrderTerminal() {
             )}
           </div>
 
-          <div className="p-6 bg-stone-50 border-t border-stone-200 rounded-b-2xl">
-            <div className="mb-4">
-              <label className="block text-xs font-semibold text-stone-500 uppercase tracking-wider mb-2">Momento do Pagamento</label>
-              <div className="grid grid-cols-2 gap-2 mb-4">
+          <div className="p-4 bg-white border-t border-stone-100 rounded-b-2xl shadow-[0_-10px_20px_-5px_rgba(0,0,0,0.05)]">
+            <div className="mb-3">
+              <label className="block text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-1.5">Momento do Pagamento</label>
+              <div className="grid grid-cols-2 gap-2 mb-3">
                 <button
                   type="button"
                   onClick={() => setPaymentStatus('paid')}
@@ -217,7 +217,7 @@ export default function OrderTerminal() {
               {paymentStatus === 'paid' && (
                 <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="space-y-4">
                   <div>
-                    <label className="block text-xs font-semibold text-stone-500 uppercase tracking-wider mb-2">Forma de Pagamento</label>
+                    <label className="block text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-1.5">Forma de Pagamento</label>
                     <div className="grid grid-cols-3 gap-2">
                       <button
                         type="button"
@@ -287,9 +287,9 @@ export default function OrderTerminal() {
               )}
             </div>
 
-            <div className="flex justify-between items-center mb-4 pt-4 border-t border-stone-200">
-              <span className="text-stone-500 font-medium">Total</span>
-              <span className="text-2xl font-black text-stone-800">R$ {total.toFixed(2)}</span>
+            <div className="flex justify-between items-center mb-3 pt-3 border-t border-stone-100">
+              <span className="text-stone-400 text-sm font-bold">Total</span>
+              <span className="text-2xl font-black text-orange-600">R$ {total.toFixed(2)}</span>
             </div>
             <button
               disabled={cart.length === 0}
