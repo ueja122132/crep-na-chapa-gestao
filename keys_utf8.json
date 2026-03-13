@@ -1,0 +1,47 @@
+﻿[
+    {
+        "name":  "anon",
+        "api_key":  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqemNjamV6Zm54bXh2cmhoenZiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMzNjA3MjMsImV4cCI6MjA4ODkzNjcyM30.AgaouWLPOoH3-xcdZ-Q-6lc_HyCaR7e406ivf9mo7aA",
+        "id":  "anon",
+        "type":  "legacy",
+        "hash":  "Y3XPBVTJ_PVg5GH7v7i5_-UrY-W4IfZ_VMP0IBP_Ko0",
+        "prefix":  "Agaou",
+        "description":  "Legacy anon API key"
+    },
+    {
+        "name":  "service_role",
+        "api_key":  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqemNjamV6Zm54bXh2cmhoenZiIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MzM2MDcyMywiZXhwIjoyMDg4OTM2NzIzfQ.uQYFp1X7-z4fYQI49zpb7Ux9O1pvb4fGMVerpik9wFk",
+        "id":  "service_role",
+        "type":  "legacy",
+        "hash":  "RD0V-40bFvAfcRtivDN11fP1WCmePJJsbK0dZNF-Uk8",
+        "prefix":  "uQYFp",
+        "description":  "Legacy service_role API key"
+    },
+    {
+        "id":  "06db0972-c654-4274-8198-c9a2dce94c04",
+        "name":  "default",
+        "type":  "publishable",
+        "api_key":  "sb_publishable__GQIEV5cX_s2CSq0KsS5Nw_Qr1g6TYw",
+        "description":  null,
+        "secret_jwt_template":  null,
+        "hash":  "x3vIkXgXdy8guGoD0xkA76A1qBhq5INmse64GyVjbaQ",
+        "prefix":  "sb_publishable__GQIE",
+        "inserted_at":  "2026-03-13T00:12:03.592009+00:00",
+        "updated_at":  "2026-03-13T00:12:03.592009+00:00"
+    },
+    {
+        "id":  "feb5e79a-2d9f-4dcf-b360-42312c2cb823",
+        "name":  "default",
+        "type":  "secret",
+        "api_key":  "sb_secret_sEcH2··························",
+        "description":  null,
+        "secret_jwt_template":  {
+                                    "role":  "service_role"
+                                },
+        "hash":  "x5La13hVa95okgSFmkoiKQdVoTdAt99-bhfooxkyEUI",
+        "prefix":  "sb_secret_sEcH2",
+        "inserted_at":  "2026-03-13T00:12:03.592009+00:00",
+        "updated_at":  "2026-03-13T00:12:03.592009+00:00"
+    }
+]
+
