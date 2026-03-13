@@ -78,7 +78,7 @@ async function startServer() {
       const { data: orders, error: ordersError } = await supabase
         .from("orders")
         .select("*, order_items(*)")
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: true });
       
       if (ordersError) throw ordersError;
       
