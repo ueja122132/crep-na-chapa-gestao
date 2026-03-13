@@ -137,28 +137,49 @@ export default function OrderTerminal() {
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-6 space-y-4">
+          <div className="flex-1 overflow-y-auto p-4 space-y-3">
             {cart.map((item, index) => (
-              <div key={index} className="flex justify-between items-start gap-4 p-3 bg-stone-50 rounded-xl border border-stone-100">
-                <div className="flex-1">
-                  <h4 className="font-bold text-stone-800 text-sm">{item.product_name}</h4>
-                  <p className="text-[10px] text-stone-500 italic">
-                    {item.customizations.join(', ') || 'Completo'}
-                  </p>
-                  <p className="text-xs font-bold text-orange-600 mt-1">R$ {item.price.toFixed(2)}</p>
+              <div key={index} className="group relative flex flex-col gap-2 p-4 bg-stone-50 rounded-2xl border border-stone-200 hover:border-orange-300 hover:bg-white transition-all">
+                <div className="flex justify-between items-start">
+                  <div className="flex-1">
+                    <h4 className="font-extrabold text-stone-900 text-base leading-tight">{item.product_name}</h4>
+                    <p className="text-[10px] text-stone-400 uppercase tracking-tighter mt-0.5">{item.product_type}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-black text-orange-600">R$ {item.price.toFixed(2)}</p>
+                  </div>
+                  <button 
+                    onClick={() => removeFromCart(index)}
+                    className="ml-2 p-1 text-stone-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                    title="Remover item"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
                 </div>
-                <button 
-                  onClick={() => removeFromCart(index)}
-                  className="text-stone-300 hover:text-red-500 transition-colors"
-                >
-                  <X className="w-4 h-4" />
-                </button>
+                
+                {item.customizations && item.customizations.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {item.customizations.map((cust, cIdx) => (
+                      <span 
+                        key={cIdx} 
+                        className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                          cust.startsWith('Sem') 
+                            ? 'bg-red-50 text-red-600 border border-red-100' 
+                            : 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+                        }`}
+                      >
+                        {cust}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
             ))}
             {cart.length === 0 && (
-              <div className="h-full flex flex-col items-center justify-center text-stone-400 opacity-50">
-                <ShoppingCart className="w-12 h-12 mb-2" />
-                <p className="text-sm">Carrinho vazio</p>
+              <div className="h-full flex flex-col items-center justify-center py-12 text-stone-400 opacity-50">
+                <ShoppingCart className="w-16 h-16 mb-4 stroke-[1.5]" />
+                <p className="font-bold">Seu carrinho está vazio</p>
+                <p className="text-xs">Adicione itens do cardápio</p>
               </div>
             )}
           </div>
