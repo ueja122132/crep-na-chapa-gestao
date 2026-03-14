@@ -226,32 +226,49 @@ async function startServer() {
   // Finance
   app.get("/api/finance/stats", async (req, res) => {
     try {
-      // Postgres equivalent for daily stats
-      const { data, error } = await supabase.rpc('get_finance_stats');
+      // Fallback if RPC not defined or for more detailed data
+      const { data: fallbackData, error: fallbackError } = await supabase
+        .from("orders")
+        .select("total_price, created_at, payment_method, order_items(product_type)")
+        .eq("payment_status", "paid");
       
-      if (error) {
-        // Fallback if RPC not defined
-        const { data: fallbackData, error: fallbackError } = await supabase
-          .from("orders")
-          .select("total_price, created_at")
-          .eq("payment_status", "paid");
-        
-        if (fallbackError) throw fallbackError;
-        
-        // Manual grouping
-        const statsMap = new Map();
-        fallbackData.forEach((order: any) => {
-          const date = new Date(order.created_at).toISOString().split('T')[0];
-          const current = statsMap.get(date) || { total_revenue: 0, total_orders: 0, date };
-          current.total_revenue += order.total_revenue || order.total_price;
-          current.total_orders += 1;
-          statsMap.set(date, current);
-        });
-        
-        return res.json(Array.from(statsMap.values()).sort((a,b) => b.date.localeCompare(a.date)));
-      }
+      if (fallbackError) throw fallbackError;
       
-      res.json(data);
+      // Manual grouping
+      const statsMap = new Map();
+      fallbackData.forEach((order: any) => {
+        const date = new Date(order.created_at).toISOString().split('T')[0];
+        const current = statsMap.get(date) || { 
+          total_revenue: 0, 
+          total_orders: 0, 
+          date,
+          by_method: { pix: 0, dinheiro: 0, cartao: 0 },
+          by_type: { crepe: 0, churrasco: 0 }
+        };
+        
+        current.total_revenue += order.total_price;
+        current.total_orders += 1;
+        
+        // Group by method
+        if (order.payment_method) {
+          const method = order.payment_method.toLowerCase();
+          if (current.by_method[method] !== undefined) {
+            current.by_method[method] += order.total_price;
+          }
+        }
+        
+        // Group by product type
+        if (order.order_items) {
+          order.order_items.forEach((item: any) => {
+            if (item.product_type === 'crepe') current.by_type.crepe += 1;
+            if (item.product_type === 'churrasco') current.by_type.churrasco += 1;
+          });
+        }
+        
+        statsMap.set(date, current);
+      });
+      
+      return res.json(Array.from(statsMap.values()).sort((a: any, b: any) => b.date.localeCompare(a.date)));
     } catch (error) {
       console.error("Error fetching finance stats:", error);
       res.status(500).json({ error: "Internal server error fetching finance stats" });

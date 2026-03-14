@@ -34,4 +34,13 @@ export interface FinanceStat {
   total_revenue: number;
   total_orders: number;
   date: string;
+  by_method: {
+    pix: number;
+    dinheiro: number;
+    cartao: number;
+  };
+  by_type: {
+    crepe: number;
+    churrasco: number;
+  };
 }
