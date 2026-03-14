@@ -377,7 +377,7 @@ export default function OrderTerminal() {
                     onClick={addToCart}
                     className="flex-[2] py-3 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-600 transition-all shadow-lg shadow-orange-200"
                   >
-                    Adicionar R$ {selectedProduct.price.toFixed(2)}
+                    Adicionar R$ {(selectedProduct.price + (extraIngredients.length * extraPrice)).toFixed(2)}
                   </button>
                 </div>
               </div>
