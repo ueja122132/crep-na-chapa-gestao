@@ -145,7 +145,7 @@ export default function KitchenDisplay() {
         </div>
         <div className="flex items-center gap-2 px-4 py-2 bg-orange-100 text-orange-700 rounded-full font-bold text-sm">
           <ChefHat className="w-4 h-4" />
-          <span>{orders.length} Pedidos Ativos</span>
+          <span>{orders.filter(o => o.status === 'pending').length} Pedidos Ativos</span>
         </div>
       </div>
 
