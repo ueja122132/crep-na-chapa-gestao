@@ -52,7 +52,7 @@ export default function KitchenDisplay() {
   const fetchOrders = async () => {
     const res = await fetch('/api/orders');
     const data = await res.json();
-    setOrders(data);
+    setOrders(data.filter((o: Order) => o.status === 'pending'));
   };
 
   const fetchProducts = async () => {
