@@ -14,6 +14,7 @@ export default function OrderTerminal() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [customizations, setCustomizations] = useState<string[]>([]);
   const [extraIngredients, setExtraIngredients] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     fetchProducts();
@@ -82,27 +83,35 @@ export default function OrderTerminal() {
   const total = cart.reduce((acc, item) => acc + item.price, 0);
 
   const finalizeOrder = async () => {
-    if (cart.length === 0) return;
+    if (cart.length === 0 || isLoading) return;
 
-    await fetch('/api/orders', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        customer_name: customerName || 'Cliente Balcão',
-        total_price: total,
-        items: cart,
-        payment_status: paymentStatus,
-        payment_method: paymentStatus === 'paid' ? paymentMethod : null,
-        amount_received: paymentStatus === 'paid' && paymentMethod === 'dinheiro' && amountReceived ? parseFloat(amountReceived) : null
-      })
-    });
+    setIsLoading(true);
+    try {
+      await fetch('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customer_name: customerName || 'Cliente Balcão',
+          total_price: total,
+          items: cart,
+          payment_status: paymentStatus,
+          payment_method: paymentStatus === 'paid' ? paymentMethod : null,
+          amount_received: paymentStatus === 'paid' && paymentMethod === 'dinheiro' && amountReceived ? parseFloat(amountReceived) : null
+        })
+      });
 
-    setCart([]);
-    setCustomerName('');
-    setPaymentStatus('paid');
-    setPaymentMethod('pix');
-    setAmountReceived('');
-    alert('Pedido enviado para a cozinha!');
+      setCart([]);
+      setCustomerName('');
+      setPaymentStatus('paid');
+      setPaymentMethod('pix');
+      setAmountReceived('');
+      alert('Pedido enviado para a cozinha!');
+    } catch (error) {
+      console.error('Erro ao finalizar pedido:', error);
+      alert('Erro ao enviar o pedido. Tente novamente.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -228,12 +237,25 @@ export default function OrderTerminal() {
             </div>
             
             <button
-              disabled={cart.length === 0}
               onClick={finalizeOrder}
-              className="w-full py-2.5 bg-orange-500 text-white font-black text-sm rounded-xl hover:bg-orange-600 transition-all shadow-md disabled:opacity-50 flex items-center justify-center gap-2"
+              disabled={cart.length === 0 || isLoading}
+              className={`w-full py-4 text-white font-black rounded-2xl transition-all flex items-center justify-center gap-3 shadow-lg shadow-orange-200/50 ${
+                cart.length === 0 || isLoading
+                  ? 'bg-stone-300 cursor-not-allowed grayscale'
+                  : 'bg-orange-600 hover:bg-orange-700 active:scale-[0.98]'
+              }`}
             >
-              <CheckCircle2 className="w-4 h-4" />
-              FINALIZAR
+              {isLoading ? (
+                <>
+                  <div className="w-5 h-5 border-3 border-white/30 border-t-white rounded-full animate-spin" />
+                  ENVIANDO...
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="w-5 h-5" />
+                  FINALIZAR PEDIDO
+                </>
+              )}
             </button>
           </div>
         </div>
@@ -297,7 +319,7 @@ export default function OrderTerminal() {
                   <div className="space-y-3">
                     <h4 className="text-xs font-black text-stone-400 uppercase tracking-widest">Acrescentar Adicionais</h4>
                     <div className="grid grid-cols-2 gap-2">
-                    {allIngredients.filter(ing => !selectedProduct.ingredients.includes(ing)).map((ing) => (
+                    {allIngredients.filter(ing => !selectedProduct?.ingredients.includes(ing)).map((ing: string) => (
                       <button
                         key={ing}
                         onClick={() => toggleExtra(ing)}
