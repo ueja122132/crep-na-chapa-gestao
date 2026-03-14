@@ -15,10 +15,25 @@ export default function OrderTerminal() {
   const [customizations, setCustomizations] = useState<string[]>([]);
   const [extraIngredients, setExtraIngredients] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [extraPrice, setExtraPrice] = useState(5.0);
 
   useEffect(() => {
     fetchProducts();
+    fetchSettings();
   }, []);
+
+  const fetchSettings = async () => {
+    try {
+      const res = await fetch('/api/settings');
+      const data = await res.json();
+      const priceSetting = data.find((s: any) => s.key === 'extra_ingredient_price');
+      if (priceSetting) {
+        setExtraPrice(parseFloat(priceSetting.value));
+      }
+    } catch (error) {
+      console.error('Error fetching settings:', error);
+    }
+  };
 
   const allIngredients = Array.from(new Set(products.flatMap(p => p.ingredients))).sort();
 
@@ -61,12 +76,13 @@ export default function OrderTerminal() {
     const extras = extraIngredients.map(ing => `+ ${ing}`);
 
     const finalCustomizations = [...removals, ...extras];
+    const finalPrice = selectedProduct.price + (extraIngredients.length * extraPrice);
 
     const newItem: OrderItem = {
       product_id: selectedProduct.id,
       product_name: selectedProduct.name,
       product_type: selectedProduct.type,
-      price: selectedProduct.price,
+      price: finalPrice,
       customizations: finalCustomizations
     };
 
@@ -317,7 +333,12 @@ export default function OrderTerminal() {
 
                   {/* Additional Ingredients */}
                   <div className="space-y-3">
-                    <h4 className="text-xs font-black text-stone-400 uppercase tracking-widest">Acrescentar Adicionais</h4>
+                    <div className="flex justify-between items-center">
+                      <h4 className="text-xs font-black text-stone-400 uppercase tracking-widest">Acrescentar Adicionais</h4>
+                      <span className="text-[10px] font-bold bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full">
+                        + R$ {extraPrice.toFixed(2)} cada
+                      </span>
+                    </div>
                     <div className="grid grid-cols-2 gap-2">
                     {allIngredients.filter(ing => !selectedProduct?.ingredients.includes(ing)).map((ing: string) => (
                       <button

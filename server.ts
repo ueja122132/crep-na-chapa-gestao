@@ -252,6 +252,28 @@ async function startServer() {
   }
 
   const PORT = process.env.PORT || 3000;
+  // Settings
+app.get('/api/settings', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('settings')
+      .select('*');
+    
+    // Fallback if table doesn't exist or is empty
+    const defaultSettings = [
+      { key: 'extra_ingredient_price', value: '5.00' }
+    ];
+
+    if (error || !data || data.length === 0) {
+      return res.json(defaultSettings);
+    }
+
+    res.json(data);
+  } catch (error) {
+    res.json([{ key: 'extra_ingredient_price', value: '5.00' }]);
+  }
+});
+
   app.listen(Number(PORT), "0.0.0.0", () => {
     console.log(`Server running on port ${PORT}`);
   });
