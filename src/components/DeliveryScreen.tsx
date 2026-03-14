@@ -1,21 +1,23 @@
 import { useState, useEffect } from 'react';
-import { Package, CheckCircle2, DollarSign, User, Clock, Banknote, CreditCard, QrCode } from 'lucide-react';
-import { Order } from '../types';
+import { Package, CheckCircle2, DollarSign, User, Clock, Banknote, CreditCard, QrCode, Edit2, Plus, Trash2, X } from 'lucide-react';
+import { Order, Product } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { supabase } from '../lib/supabase';
 
 export default function DeliveryScreen() {
   const [orders, setOrders] = useState<Order[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [activeTab, setActiveTab] = useState<'ready' | 'delivered'>('ready');
   const [payingOrder, setPayingOrder] = useState<number | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<'pix' | 'dinheiro' | 'cartao'>('pix');
   const [amountReceived, setAmountReceived] = useState<string>('');
+  const [editingItem, setEditingItem] = useState<{orderId: number, itemId: number, currentCustoms: string[], productId: number} | null>(null);
 
   useEffect(() => {
     fetchOrders();
+    fetchProducts();
 
-    // Subscribe to changes in the 'orders' table
-    const channel = supabase
+    const ordersChannel = supabase
       .channel('delivery-orders')
       .on(
         'postgres_changes',
@@ -26,8 +28,20 @@ export default function DeliveryScreen() {
       )
       .subscribe();
 
+    const itemsChannel = supabase
+      .channel('delivery-items')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'order_items' },
+        () => {
+          fetchOrders();
+        }
+      )
+      .subscribe();
+
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(ordersChannel);
+      supabase.removeChannel(itemsChannel);
     };
   }, []);
 
@@ -35,6 +49,12 @@ export default function DeliveryScreen() {
     const res = await fetch('/api/orders');
     const data = await res.json();
     setOrders(data);
+  };
+
+  const fetchProducts = async () => {
+    const res = await fetch('/api/products');
+    const data = await res.json();
+    setProducts(data);
   };
 
   const markAsPaid = async (order: Order) => {
@@ -50,6 +70,29 @@ export default function DeliveryScreen() {
     setPayingOrder(null);
     setAmountReceived('');
     fetchOrders();
+  };
+
+  const updateItemCustomizations = async () => {
+    if (!editingItem) return;
+    
+    await fetch(`/api/order-items/${editingItem.itemId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ customizations: editingItem.currentCustoms })
+    });
+    
+    setEditingItem(null);
+    fetchOrders();
+  };
+
+  const toggleIngredient = (ingredient: string) => {
+    if (!editingItem) return;
+    
+    const newCustoms = editingItem.currentCustoms.includes(ingredient)
+      ? editingItem.currentCustoms.filter(c => c !== ingredient)
+      : [...editingItem.currentCustoms, ingredient];
+      
+    setEditingItem({ ...editingItem, currentCustoms: newCustoms });
   };
 
   const markAsDelivered = async (id: number) => {
@@ -130,6 +173,35 @@ export default function DeliveryScreen() {
                 <div className="flex justify-between items-center bg-stone-50 p-3 rounded-xl border border-stone-100">
                   <span className="text-sm font-bold text-stone-500">Total:</span>
                   <span className="text-lg font-black text-stone-800">R$ {order.total_price.toFixed(2)}</span>
+                </div>
+
+                <div className="space-y-3 py-2">
+                  <p className="text-[10px] font-black text-stone-400 uppercase tracking-widest">Itens do Pedido</p>
+                  <div className="space-y-2 max-h-48 overflow-y-auto pr-1 custom-scrollbar">
+                    {order.items.map((item, i) => (
+                      <div key={i} className="flex items-start justify-between gap-2 p-2 rounded-xl bg-stone-50 border border-stone-100 group">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-bold text-stone-800 truncate">{item.product_name}</p>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {item.customizations.map((cust, j) => (
+                              <span key={j} className="text-[8px] font-bold text-stone-500 bg-white px-1 py-0.5 rounded border border-stone-100">{cust}</span>
+                            ))}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => setEditingItem({
+                            orderId: order.id,
+                            itemId: item.id!,
+                            currentCustoms: item.customizations,
+                            productId: item.product_id
+                          })}
+                          className="p-1 px-2 bg-white border border-stone-200 rounded-lg text-stone-400 hover:text-stone-600 transition-colors"
+                        >
+                          <Edit2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
                 <div className="space-y-2">
@@ -270,6 +342,91 @@ export default function DeliveryScreen() {
           </div>
         )}
       </div>
+
+      {/* Edit Overlay */}
+      <AnimatePresence>
+        {editingItem && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setEditingItem(null)}
+              className="absolute inset-0 bg-stone-900/60 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden"
+            >
+              <div className="p-6 bg-stone-50 border-b border-stone-100 flex justify-between items-center">
+                <div>
+                  <h3 className="text-xl font-bold text-stone-800">Editar Ingredientes</h3>
+                  <p className="text-sm text-stone-500">Adicione ou remova ingredientes do item</p>
+                </div>
+                <button onClick={() => setEditingItem(null)} className="p-2 hover:bg-stone-200 rounded-full transition-colors">
+                  <X className="w-5 h-5 text-stone-400" />
+                </button>
+              </div>
+              
+              <div className="p-6 space-y-6">
+                <div className="space-y-3">
+                  <h4 className="text-xs font-black text-stone-400 uppercase tracking-widest">Opções Disponíveis</h4>
+                  <div className="grid grid-cols-2 gap-2">
+                    {products.find(p => p.id === editingItem.productId)?.ingredients.map((ing) => (
+                      <button
+                        key={ing}
+                        onClick={() => toggleIngredient(ing)}
+                        className={`flex items-center justify-between p-3 rounded-2xl border-2 transition-all font-bold text-sm ${
+                          editingItem.currentCustoms.includes(ing)
+                            ? 'bg-orange-50 border-orange-200 text-orange-700'
+                            : 'bg-white border-stone-100 text-stone-600 hover:border-stone-200'
+                        }`}
+                      >
+                        {ing}
+                        {editingItem.currentCustoms.includes(ing) ? <Trash2 className="w-4 h-4 opacity-50" /> : <Plus className="w-4 h-4 opacity-30" />}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Add removals */}
+                <div className="space-y-3">
+                  <h4 className="text-xs font-black text-stone-400 uppercase tracking-widest">Remover (Sem...)</h4>
+                  <div className="flex flex-wrap gap-2">
+                     {products.find(p => p.id === editingItem.productId)?.ingredients.map((ing) => {
+                       const removalText = `Sem ${ing}`;
+                       return (
+                        <button
+                          key={removalText}
+                          onClick={() => toggleIngredient(removalText)}
+                          className={`px-3 py-2 rounded-xl border text-xs font-bold transition-all ${
+                            editingItem.currentCustoms.includes(removalText)
+                              ? 'bg-red-50 border-red-200 text-red-700'
+                              : 'bg-white border-stone-200 text-stone-500'
+                          }`}
+                        >
+                          {removalText}
+                        </button>
+                       );
+                     })}
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-6 bg-stone-50 border-t border-stone-100">
+                <button
+                  onClick={updateItemCustomizations}
+                  className="w-full py-4 bg-stone-800 text-white font-bold rounded-2xl hover:bg-stone-900 transition-all flex items-center justify-center gap-2"
+                >
+                  Salvar Alterações
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

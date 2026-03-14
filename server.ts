@@ -158,6 +158,26 @@ async function startServer() {
     }
   });
 
+  app.patch("/api/order-items/:id", async (req, res) => {
+    try {
+      const { customizations } = req.body;
+      if (!customizations || !Array.isArray(customizations)) {
+        return res.status(400).json({ error: "customizations array is required" });
+      }
+
+      const { error } = await supabase
+        .from("order_items")
+        .update({ customizations })
+        .eq("id", req.params.id);
+
+      if (error) throw error;
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error updating order item:", error);
+      res.status(500).json({ error: "Internal server error updating order item" });
+    }
+  });
+
   app.patch("/api/orders/:id/payment", async (req, res) => {
     try {
       const { payment_status, payment_method, amount_received } = req.body;
