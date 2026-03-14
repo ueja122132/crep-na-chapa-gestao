@@ -52,7 +52,7 @@ export default function KitchenDisplay() {
   const fetchOrders = async () => {
     const res = await fetch('/api/orders');
     const data = await res.json();
-    setOrders(data.filter((o: Order) => o.status === 'pending'));
+    setOrders(data);
   };
 
   const fetchProducts = async () => {
@@ -150,8 +150,8 @@ export default function KitchenDisplay() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                <AnimatePresence mode="popLayout">
-          {orders.map((order, index) => (
+        <AnimatePresence mode="popLayout">
+          {orders.filter(o => o.status === 'pending').map((order) => (
             <motion.div
               key={order.id}
               layout
@@ -355,7 +355,7 @@ export default function KitchenDisplay() {
                   <div className="space-y-3">
                     <h4 className="text-xs font-black text-stone-400 uppercase tracking-widest">Adicionar Extras</h4>
                     <div className="grid grid-cols-2 gap-2">
-                      {allIngredients.filter(ing => !products.find(p => p.id === editingItem.productId)?.ingredients.includes(ing)).map((ing) => (
+                      {allIngredients.filter(ing => !products.find(p => p.id === editingItem.productId)?.ingredients.includes(ing)).map((ing: string) => (
                         <button
                           key={ing}
                           onClick={() => toggleExtra(ing)}
