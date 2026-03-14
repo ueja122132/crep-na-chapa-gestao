@@ -13,10 +13,13 @@ export default function OrderTerminal() {
   const [isOrdering, setIsOrdering] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [customizations, setCustomizations] = useState<string[]>([]);
+  const [extraIngredients, setExtraIngredients] = useState<string[]>([]);
 
   useEffect(() => {
     fetchProducts();
   }, []);
+
+  const allIngredients = Array.from(new Set(products.flatMap(p => p.ingredients))).sort();
 
   const fetchProducts = async () => {
     const res = await fetch('/api/products');
@@ -27,6 +30,7 @@ export default function OrderTerminal() {
   const openCustomizer = (product: Product) => {
     setSelectedProduct(product);
     setCustomizations(product.ingredients);
+    setExtraIngredients([]);
     setIsOrdering(true);
   };
 
@@ -38,12 +42,24 @@ export default function OrderTerminal() {
     }
   };
 
+  const toggleExtra = (ingredient: string) => {
+    if (extraIngredients.includes(ingredient)) {
+      setExtraIngredients(extraIngredients.filter(i => i !== ingredient));
+    } else {
+      setExtraIngredients([...extraIngredients, ingredient]);
+    }
+  };
+
   const addToCart = () => {
     if (!selectedProduct) return;
     
-    const finalCustomizations = selectedProduct.ingredients.map(ing => {
-      return customizations.includes(ing) ? ing : `Sem ${ing}`;
-    });
+    const removals = selectedProduct.ingredients
+      .filter(ing => !customizations.includes(ing))
+      .map(ing => `Sem ${ing}`);
+      
+    const extras = extraIngredients.map(ing => `+ ${ing}`);
+
+    const finalCustomizations = [...removals, ...extras];
 
     const newItem: OrderItem = {
       product_id: selectedProduct.id,
@@ -56,6 +72,7 @@ export default function OrderTerminal() {
     setCart([...cart, newItem]);
     setIsOrdering(false);
     setSelectedProduct(null);
+    setExtraIngredients([]);
   };
 
   const removeFromCart = (index: number) => {
@@ -250,25 +267,57 @@ export default function OrderTerminal() {
               </div>
 
               <div className="p-6">
-                <div className="space-y-3 max-h-[40vh] overflow-y-auto pr-2">
-                  {selectedProduct.ingredients.map((ing) => (
-                    <button
-                      key={ing}
-                      onClick={() => toggleCustomization(ing)}
-                      className={`w-full flex items-center justify-between p-4 rounded-2xl border transition-all ${
-                        customizations.includes(ing)
-                          ? 'bg-orange-50 border-orange-500 text-orange-700'
-                          : 'bg-stone-50 border-stone-200 text-stone-600 hover:border-stone-300'
-                      }`}
-                    >
-                      <span className="font-medium">{ing}</span>
-                      {customizations.includes(ing) ? (
-                        <CheckCircle2 className="w-5 h-5" />
-                      ) : (
-                        <div className="w-5 h-5 rounded-full border-2 border-stone-300" />
-                      )}
-                    </button>
-                  ))}
+                <div className="space-y-6 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
+                  {/* Base Ingredients */}
+                  <div className="space-y-3">
+                    <h4 className="text-xs font-black text-stone-400 uppercase tracking-widest">Ingredientes Base</h4>
+                    <div className="grid grid-cols-1 gap-2">
+                    {selectedProduct.ingredients.map((ing) => (
+                      <button
+                        key={ing}
+                        onClick={() => toggleCustomization(ing)}
+                        className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${
+                          customizations.includes(ing)
+                            ? 'bg-emerald-50 border-emerald-500 text-emerald-700'
+                            : 'bg-red-50 border-red-200 text-red-700 hover:border-red-300'
+                        }`}
+                      >
+                        <span className="font-bold">{ing}</span>
+                        {customizations.includes(ing) ? (
+                          <CheckCircle2 className="w-5 h-5" />
+                        ) : (
+                          <span className="text-[10px] font-black uppercase">Removido</span>
+                        )}
+                      </button>
+                    ))}
+                    </div>
+                  </div>
+
+                  {/* Additional Ingredients */}
+                  <div className="space-y-3">
+                    <h4 className="text-xs font-black text-stone-400 uppercase tracking-widest">Acrescentar Adicionais</h4>
+                    <div className="grid grid-cols-2 gap-2">
+                    {allIngredients.filter(ing => !selectedProduct.ingredients.includes(ing)).map((ing) => (
+                      <button
+                        key={ing}
+                        onClick={() => toggleExtra(ing)}
+                        className={`flex items-center justify-between p-3 rounded-2xl border transition-all font-bold text-sm ${
+                          extraIngredients.includes(ing)
+                            ? 'bg-orange-50 border-orange-500 text-orange-700'
+                            : 'bg-stone-50 border-stone-200 text-stone-600 hover:border-stone-300'
+                        }`}
+                      >
+                        {ing}
+                        {extraIngredients.includes(ing) ? (
+                          <Plus className="w-4 h-4 text-orange-500" />
+                        ) : (
+                          <Plus className="w-4 h-4 opacity-20" />
+                        )}
+                      </button>
+                    ))}
+                    </div>
+                  </div>
+                  
                   {selectedProduct.ingredients.length === 0 && (
                     <p className="text-center text-stone-400 py-4 italic">Nenhum ingrediente base listado.</p>
                   )}

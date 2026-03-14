@@ -12,6 +12,7 @@ export default function DeliveryScreen() {
   const [paymentMethod, setPaymentMethod] = useState<'pix' | 'dinheiro' | 'cartao'>('pix');
   const [amountReceived, setAmountReceived] = useState<string>('');
   const [editingItem, setEditingItem] = useState<{orderId: number, itemId: number, currentCustoms: string[], productId: number} | null>(null);
+  const [extraIngredients, setExtraIngredients] = useState<string[]>([]);
 
   useEffect(() => {
     fetchOrders();
@@ -45,6 +46,8 @@ export default function DeliveryScreen() {
     };
   }, []);
 
+  const allIngredients = Array.from(new Set(products.flatMap(p => p.ingredients))).sort();
+
   const fetchOrders = async () => {
     const res = await fetch('/api/orders');
     const data = await res.json();
@@ -75,13 +78,19 @@ export default function DeliveryScreen() {
   const updateItemCustomizations = async () => {
     if (!editingItem) return;
     
+    // Merge actual customizations with new extras
+    const baseCustoms = editingItem.currentCustoms.filter(c => !c.startsWith('+ '));
+    const extras = extraIngredients.map(ing => `+ ${ing}`);
+    const finalCustoms = [...baseCustoms, ...extras];
+
     await fetch(`/api/order-items/${editingItem.itemId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ customizations: editingItem.currentCustoms })
+      body: JSON.stringify({ customizations: finalCustoms })
     });
     
     setEditingItem(null);
+    setExtraIngredients([]);
     fetchOrders();
   };
 
@@ -93,6 +102,28 @@ export default function DeliveryScreen() {
       : [...editingItem.currentCustoms, ingredient];
       
     setEditingItem({ ...editingItem, currentCustoms: newCustoms });
+  };
+
+  const toggleExtra = (ingredient: string) => {
+    if (extraIngredients.includes(ingredient)) {
+      setExtraIngredients(extraIngredients.filter(i => i !== ingredient));
+    } else {
+      setExtraIngredients([...extraIngredients, ingredient]);
+    }
+  };
+
+  const openEditor = (orderId: number, item: any) => {
+    const itemExtras = item.customizations
+      .filter((c: string) => c.startsWith('+ '))
+      .map((c: string) => c.replace('+ ', ''));
+      
+    setEditingItem({
+      orderId,
+      itemId: item.id!,
+      currentCustoms: item.customizations,
+      productId: item.product_id
+    });
+    setExtraIngredients(itemExtras);
   };
 
   const markAsDelivered = async (id: number) => {
@@ -370,11 +401,11 @@ export default function DeliveryScreen() {
                 </button>
               </div>
               
-              <div className="p-6 space-y-6">
+              <div className="p-6 space-y-6 max-h-[60vh] overflow-y-auto custom-scrollbar">
                 <div className="space-y-3">
-                  <h4 className="text-xs font-black text-stone-400 uppercase tracking-widest">Opções Disponíveis</h4>
+                  <h4 className="text-xs font-black text-stone-400 uppercase tracking-widest">Opções da Base</h4>
                   <div className="grid grid-cols-2 gap-2">
-                    {products.find(p => p.id === editingItem.productId)?.ingredients.map((ing) => (
+                    {products.find(p => p.id === editingItem.productId)?.ingredients.map((ing: string) => (
                       <button
                         key={ing}
                         onClick={() => toggleIngredient(ing)}
@@ -391,11 +422,31 @@ export default function DeliveryScreen() {
                   </div>
                 </div>
 
-                {/* Add removals */}
+                {/* Extras section */}
+                <div className="space-y-3">
+                  <h4 className="text-xs font-black text-stone-400 uppercase tracking-widest">Adicionar Extras</h4>
+                  <div className="grid grid-cols-2 gap-2">
+                    {allIngredients.filter(ing => !products.find(p => p.id === editingItem.productId)?.ingredients.includes(ing)).map((ing: string) => (
+                      <button
+                        key={ing}
+                        onClick={() => toggleExtra(ing)}
+                        className={`flex items-center justify-between p-3 rounded-2xl border-2 transition-all font-bold text-sm ${
+                          extraIngredients.includes(ing)
+                            ? 'bg-emerald-50 border-emerald-500 text-emerald-700'
+                            : 'bg-white border-stone-100 text-stone-600 hover:border-stone-200'
+                        }`}
+                      >
+                        {ing}
+                        {extraIngredients.includes(ing) ? <CheckCircle2 className="w-4 h-4" /> : <Plus className="w-4 h-4 opacity-30" />}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 <div className="space-y-3">
                   <h4 className="text-xs font-black text-stone-400 uppercase tracking-widest">Remover (Sem...)</h4>
                   <div className="flex flex-wrap gap-2">
-                     {products.find(p => p.id === editingItem.productId)?.ingredients.map((ing) => {
+                     {products.find(p => p.id === editingItem.productId)?.ingredients.map((ing: string) => {
                        const removalText = `Sem ${ing}`;
                        return (
                         <button
