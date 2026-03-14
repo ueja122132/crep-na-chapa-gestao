@@ -268,11 +268,17 @@ async function startServer() {
         statsMap.set(date, current);
       });
       
+      console.log(`Finance stats generated for ${statsMap.size} days`);
       return res.json(Array.from(statsMap.values()).sort((a: any, b: any) => b.date.localeCompare(a.date)));
     } catch (error) {
       console.error("Error fetching finance stats:", error);
       res.status(500).json({ error: "Internal server error fetching finance stats" });
     }
+  });
+
+  // Health check
+  app.get("/api/health", (req, res) => {
+    res.json({ status: "ok" });
   });
 
   // Vite middleware for development
@@ -283,8 +289,15 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
+    // Serve static files from dist
     app.use(express.static(path.join(__dirname, "dist")));
-    app.get("*", (req, res) => {
+    
+    // Catch-all route for SPA - MUST BE LAST
+    app.get("*", (req, res, next) => {
+      // If it's an API route that wasn't matched, skip to error/404
+      if (req.url.startsWith('/api')) {
+        return next();
+      }
       res.sendFile(path.join(__dirname, "dist", "index.html"));
     });
   }
