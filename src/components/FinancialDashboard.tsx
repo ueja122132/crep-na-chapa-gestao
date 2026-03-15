@@ -180,7 +180,7 @@ export default function FinancialDashboard() {
                   tickLine={false} 
                   tick={{fill: '#a8a29e', fontSize: 12}}
                   tickFormatter={(str) => {
-                    const d = new Date(str);
+                    const d = new Date(str + 'T12:00:00');
                     return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
                   }}
                 />
@@ -188,7 +188,10 @@ export default function FinancialDashboard() {
                 <Tooltip 
                   contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
                   formatter={(value: number) => [`R$ ${value.toFixed(2)}`, 'Faturamento']}
-                  labelFormatter={(label) => new Date(label).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' })}
+                  labelFormatter={(label) => {
+                    const d = new Date(label + 'T12:00:00');
+                    return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' });
+                  }}
                 />
                 <Area type="monotone" dataKey="total_revenue" stroke="#F97316" strokeWidth={3} fillOpacity={1} fill="url(#colorRevenue)" />
               </AreaChart>
@@ -285,11 +288,13 @@ export default function FinancialDashboard() {
                 <div className="flex items-center gap-4">
                   <div className="text-center w-12 h-12 flex flex-col justify-center bg-white rounded-xl border border-stone-100 shadow-sm">
                     <span className="text-[10px] font-black text-stone-400 uppercase leading-none">DIA</span>
-                    <span className="text-lg font-black text-stone-800 leading-none">{new Date(stat.date).getDate()}</span>
+                    <span className="text-lg font-black text-stone-800 leading-none">
+                      {new Date(stat.date + 'T12:00:00').getDate()}
+                    </span>
                   </div>
                   <div>
                     <p className="text-sm font-bold text-stone-800">
-                      {new Date(stat.date).toLocaleDateString('pt-BR', { weekday: 'long' })}
+                      {new Date(stat.date + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long' })}
                     </p>
                     <p className="text-xs text-stone-400 font-medium">{stat.total_orders} pedidos realizados</p>
                   </div>
