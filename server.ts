@@ -237,11 +237,11 @@ async function startServer() {
       // Manual grouping
       const statsMap = new Map();
       fallbackData.forEach((order: any) => {
-        // Business Day Logic: Shift 6 hours back from UTC
-        // This ensures orders made until ~3 AM (Sao Paulo) are grouped with the previous day
+        // Align with Brazil Time (UTC-3)
+        // Shifting 3 hours back from UTC to get the correct civil day string (YYYY-MM-DD)
         const d = new Date(order.created_at);
-        const businessDay = new Date(d.getTime() - (6 * 60 * 60 * 1000));
-        const date = businessDay.toISOString().split('T')[0];
+        const brtDate = new Date(d.getTime() - (3 * 60 * 60 * 1000));
+        const date = brtDate.toISOString().split('T')[0];
         
         const current = statsMap.get(date) || { 
           total_revenue: 0, 
