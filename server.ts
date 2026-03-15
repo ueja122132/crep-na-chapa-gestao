@@ -237,11 +237,11 @@ async function startServer() {
       // Manual grouping
       const statsMap = new Map();
       fallbackData.forEach((order: any) => {
-        // Explicitly shift to America/Sao_Paulo (UTC-3) for business day grouping
-        // This is more robust than Intl if timezone data is missing on server
-        const d = new Date(order.created_at);
-        const saoPauloTime = new Date(d.getTime() - (3 * 60 * 60 * 1000));
-        const date = saoPauloTime.toISOString().split('T')[0];
+        // Explicitly get YYYY-MM-DD in America/Sao_Paulo time using Intl
+        // fr-CA locale consistently returns YYYY-MM-DD
+        const date = new Intl.DateTimeFormat('fr-CA', { 
+          timeZone: 'America/Sao_Paulo' 
+        }).format(new Date(order.created_at));
         
         const current = statsMap.get(date) || { 
           total_revenue: 0, 

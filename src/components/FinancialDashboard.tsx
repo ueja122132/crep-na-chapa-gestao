@@ -56,8 +56,10 @@ export default function FinancialDashboard() {
   const filteredStats = stats.filter(s => {
     const date = new Date(s.date + 'T00:00:00');
     const now = new Date();
-    // Explicitly build YYYY-MM-DD in local time to match header and avoid browser shifts
-    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    // Use Intl for todayStr to be 100% consistent with backend Sao Paulo time
+    const todayStr = new Intl.DateTimeFormat('fr-CA', { 
+      timeZone: 'America/Sao_Paulo' 
+    }).format(now);
     
     if (filter === 'today') return s.date === todayStr;
     if (filter === 'all') return true;
