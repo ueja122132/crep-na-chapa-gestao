@@ -241,7 +241,12 @@ export default function KitchenDisplay() {
               </div>
 
               {/* Card Footer */}
-              <div className="p-4 bg-stone-50 border-t border-stone-100 mt-auto space-y-2">
+              <div className="p-4 bg-stone-50 border-t border-stone-100 mt-auto space-y-3">
+                <div className="flex justify-between items-center bg-white p-2.5 rounded-xl border border-stone-100">
+                  <span className="text-xs font-bold text-stone-500">Total do Pedido:</span>
+                  <span className="text-base font-black text-stone-800 tracking-tight">R$ {order.total_price.toFixed(2)}</span>
+                </div>
+
                 {order.payment_status === 'pending' && payingOrder !== order.id && (
                   <button
                     onClick={() => setPayingOrder(order.id)}
@@ -259,27 +264,41 @@ export default function KitchenDisplay() {
                         <button
                           key={method}
                           onClick={() => setPaymentMethod(method as any)}
-                          className={`flex flex-col items-center justify-center gap-1 py-1 px-1 rounded-lg border text-[10px] font-bold transition-all ${
+                          className={`flex flex-col items-center justify-center gap-1 py-1.5 px-1 rounded-lg border text-[10px] font-bold transition-all ${
                             paymentMethod === method ? 'bg-stone-800 border-stone-800 text-white' : 'bg-white border-stone-200 text-stone-500'
                           }`}
                         >
-                          {method === 'pix' ? <QrCode className="w-3 h-3" /> : method === 'dinheiro' ? <Banknote className="w-3 h-3" /> : <CreditCard className="w-3 h-3" />}
+                          {method === 'pix' ? <QrCode className="w-3.5 h-3.5" /> : method === 'dinheiro' ? <Banknote className="w-3.5 h-3.5" /> : <CreditCard className="w-3.5 h-3.5" />}
                           {method.toUpperCase()}
                         </button>
                       ))}
                     </div>
                     {paymentMethod === 'dinheiro' && (
-                      <input
-                        type="number"
-                        value={amountReceived}
-                        onChange={(e) => setAmountReceived(e.target.value)}
-                        className="w-full px-2 py-1.5 bg-stone-50 border border-stone-200 rounded-lg text-xs font-bold"
-                        placeholder="Valor R$"
-                      />
+                      <div className="space-y-2">
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={amountReceived}
+                          onChange={(e) => setAmountReceived(e.target.value)}
+                          className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-lg text-sm font-bold focus:outline-none focus:ring-2 focus:ring-orange-500"
+                          placeholder="Valor Recebido R$"
+                        />
+                        {parseFloat(amountReceived) >= order.total_price && (
+                          <div className="flex justify-between items-center px-1 text-[11px]">
+                            <span className="font-bold text-stone-500 italic">Troco:</span>
+                            <span className="font-black text-emerald-600">R$ {(parseFloat(amountReceived) - order.total_price).toFixed(2)}</span>
+                          </div>
+                        )}
+                      </div>
                     )}
-                    <div className="flex gap-1 pt-1">
-                      <button onClick={() => setPayingOrder(null)} className="flex-1 py-1.5 bg-stone-100 text-stone-500 font-bold rounded-lg text-[10px]">X</button>
-                      <button onClick={() => markAsPaid(order)} className="flex-2 py-1.5 bg-emerald-500 text-white font-bold rounded-lg text-[10px]">Confirmar</button>
+                    <div className="flex gap-1.5 pt-1">
+                      <button onClick={() => setPayingOrder(null)} className="flex-1 py-2 bg-stone-100 text-stone-500 font-bold rounded-lg text-xs hover:bg-stone-200 transition-colors">Cancelar</button>
+                      <button 
+                        onClick={() => markAsPaid(order)} 
+                        className="flex-[2] py-2 bg-emerald-500 text-white font-bold rounded-lg text-xs hover:bg-emerald-600 transition-colors shadow-sm shadow-emerald-100"
+                      >
+                        Confirmar
+                      </button>
                     </div>
                   </div>
                 )}
