@@ -56,8 +56,8 @@ export default function FinancialDashboard() {
   const filteredStats = stats.filter(s => {
     const date = new Date(s.date + 'T00:00:00');
     const now = new Date();
-    // Use local date in YYYY-MM-DD format (en-CA is stable for this)
-    const todayStr = now.toLocaleDateString('en-CA');
+    // Explicitly build YYYY-MM-DD in local time to match header and avoid browser shifts
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     
     if (filter === 'today') return s.date === todayStr;
     if (filter === 'all') return true;
