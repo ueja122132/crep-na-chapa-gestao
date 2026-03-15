@@ -43,4 +43,5 @@ export interface FinanceStat {
     crepe: number;
     churrasco: number;
   };
+  top_products?: Array<{ name: string, count: number }>;
 }

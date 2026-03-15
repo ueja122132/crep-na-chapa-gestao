@@ -11,7 +11,10 @@ import {
   Filter,
   CreditCard,
   Wallet,
-  Smartphone
+  Smartphone,
+  Medal,
+  Trophy,
+  Crown
 } from 'lucide-react';
 import { FinanceStat } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
@@ -117,41 +120,57 @@ export default function FinancialDashboard() {
         </div>
       </div>
 
-      {/* Main Metrics Card Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard 
-          title="Faturamento" 
-          value={`R$ ${totalRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} 
-          icon={<DollarSign className="w-6 h-6" />}
-          color="bg-emerald-500"
-          trend={filter === 'today' ? "Hoje" : filter === 'all' ? "Período Total" : `${filter.toUpperCase()} Recentes`}
-          positive={true}
-        />
-        <StatCard 
-          title="Pedidos" 
-          value={totalOrders.toString()} 
-          icon={<ShoppingBag className="w-6 h-6" />}
-          color="bg-orange-500"
-          trend={filter === 'today' ? "Hoje" : "Concluídos"}
-          positive={true}
-        />
-        <StatCard 
-          title="Ticket Médio" 
-          value={`R$ ${avgTicket.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} 
-          icon={<TrendingUp className="w-6 h-6" />}
-          color="bg-indigo-500"
-          trend="Por venda"
-          positive={true}
-        />
-        <StatCard 
-          title={`${totalCrepes > totalChurrasco ? 'Crepe' : 'Churrasco'} em Alta`} 
-          value={Math.max(totalCrepes, totalChurrasco).toString()} 
-          icon={<BarChart3 className="w-6 h-6" />}
-          color="bg-amber-500"
-          trend="Mais vendido"
-          positive={true}
-        />
-      </div>
+      {/* Global Ranking calculation for periods */}
+      {(() => {
+        const topOverall = filter === 'today' 
+          ? filteredStats[0]?.top_products || []
+          : Object.entries(filteredStats.reduce((acc, curr) => {
+              (curr.top_products || []).forEach(p => {
+                acc[p.name] = (acc[p.name] || 0) + p.count;
+              });
+              return acc;
+            }, {} as Record<string, number>))
+              .map(([name, count]) => ({ name, count: count as number }))
+              .sort((a, b) => b.count - a.count)
+              .slice(0, 3);
+        
+        return (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <StatCard 
+              title="Faturamento" 
+              value={`R$ ${totalRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} 
+              icon={<DollarSign className="w-6 h-6" />}
+              color="bg-emerald-500"
+              trend={filter === 'today' ? "Hoje" : filter === 'all' ? "Período Total" : `${filter.toUpperCase()} Recentes`}
+              positive={true}
+            />
+            <StatCard 
+              title="Pedidos" 
+              value={totalOrders.toString()} 
+              icon={<ShoppingBag className="w-6 h-6" />}
+              color="bg-orange-500"
+              trend={filter === 'today' ? "Hoje" : "Concluídos"}
+              positive={true}
+            />
+            <StatCard 
+              title="Ticket Médio" 
+              value={`R$ ${avgTicket.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} 
+              icon={<TrendingUp className="w-6 h-6" />}
+              color="bg-indigo-500"
+              trend="Por venda"
+              positive={true}
+            />
+            <StatCard 
+              title="Favorito do Dia" 
+              value={topOverall[0]?.name || '---'} 
+              icon={<Crown className="w-6 h-6" />}
+              color="bg-amber-500"
+              trend={`${topOverall[0]?.count || 0} vendidos`}
+              positive={true}
+            />
+          </div>
+        );
+      })()}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Sales Chart */}
@@ -236,7 +255,7 @@ export default function FinancialDashboard() {
             </div>
           </div>
 
-          <div className="space-y-4">
+          <div className="space-y-4 mb-8">
             {methodsData.map((item, i) => (
               <div key={i} className="flex justify-between items-center group cursor-pointer">
                 <div className="flex items-center gap-3">
@@ -251,6 +270,69 @@ export default function FinancialDashboard() {
                 </div>
               </div>
             ))}
+          </div>
+
+          {/* Top 3 Ranking Card */}
+          <div className="bg-stone-800/50 p-6 rounded-2xl border border-stone-700/50 mt-6 overflow-hidden relative group">
+            <div className="absolute -right-2 -top-2 text-stone-700 opacity-20 group-hover:rotate-12 transition-transform duration-500">
+              <Medal className="w-16 h-16" />
+            </div>
+            
+            <div className="flex items-center gap-3 mb-6 relative">
+              <div className="p-3 bg-amber-500/20 text-amber-500 rounded-xl">
+                <Medal className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-black text-white uppercase tracking-widest">Top 3 Crepes</h3>
+                <p className="text-[10px] text-stone-400 font-bold uppercase tracking-widest">Mais vendidos</p>
+              </div>
+            </div>
+            
+            <div className="space-y-3 relative">
+              {(() => {
+                const ranking = filter === 'today' 
+                  ? (filteredStats[0]?.top_products || [])
+                  : Object.entries(filteredStats.reduce((acc, curr) => {
+                      (curr.top_products || []).forEach(p => {
+                        acc[p.name] = (acc[p.name] || 0) + p.count;
+                      });
+                      return acc;
+                    }, {} as Record<string, number>))
+                      .map(([name, count]) => ({ name, count: count as number }))
+                      .sort((a, b) => b.count - a.count)
+                      .slice(0, 3);
+                
+                if (ranking.length === 0) return (
+                  <div className="py-6 text-center text-stone-500 text-xs font-bold italic uppercase tracking-widest">
+                    Nenhum hoje
+                  </div>
+                );
+
+                return ranking.map((p, idx) => (
+                  <motion.div 
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: idx * 0.1 }}
+                    key={p.name} 
+                    className="flex items-center justify-between p-3 bg-stone-800 rounded-xl border border-stone-700/30 hover:border-amber-500/30 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`w-6 h-6 flex items-center justify-center rounded-lg font-black text-[10px]
+                        ${idx === 0 ? 'bg-amber-500 text-stone-900' : 
+                          idx === 1 ? 'bg-stone-400 text-stone-900' : 
+                          'bg-stone-600 text-stone-200'}`}
+                      >
+                        {idx + 1}º
+                      </div>
+                      <span className="font-bold text-stone-300 uppercase text-[10px] tracking-wider">{p.name}</span>
+                    </div>
+                    <span className="font-black text-white bg-stone-900/50 px-2 py-1 rounded-lg text-[10px] border border-stone-700">
+                      {p.count}
+                    </span>
+                  </motion.div>
+                ));
+              })()}
+            </div>
           </div>
         </div>
       </div>

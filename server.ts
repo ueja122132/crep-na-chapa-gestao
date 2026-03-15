@@ -229,7 +229,7 @@ async function startServer() {
       // Fallback if RPC not defined or for more detailed data
       const { data: fallbackData, error: fallbackError } = await supabase
         .from("orders")
-        .select("total_price, created_at, payment_method, order_items(product_type)")
+        .select("total_price, created_at, payment_method, order_items(product_type, product_name)")
         .eq("payment_status", "paid");
       
       if (fallbackError) throw fallbackError;
@@ -248,7 +248,8 @@ async function startServer() {
           total_orders: 0, 
           date,
           by_method: { pix: 0, dinheiro: 0, cartao: 0 },
-          by_type: { crepe: 0, churrasco: 0 }
+          by_type: { crepe: 0, churrasco: 0 },
+          product_sales: {} as Record<string, number>
         };
         
         current.total_revenue += order.total_price;
@@ -262,19 +263,37 @@ async function startServer() {
           }
         }
         
-        // Group by product type
+        // Group by product type and count sales for ranking
         if (order.order_items) {
           order.order_items.forEach((item: any) => {
-            if (item.product_type === 'crepe') current.by_type.crepe += 1;
-            if (item.product_type === 'churrasco') current.by_type.churrasco += 1;
+            const type = item.product_type?.toLowerCase();
+            if (type === 'crepe') {
+              current.by_type.crepe += 1;
+              if (item.product_name) {
+                current.product_sales[item.product_name] = (current.product_sales[item.product_name] || 0) + 1;
+              }
+            } else if (type === 'churrasco') {
+              current.by_type.churrasco += 1;
+            }
           });
         }
         
         statsMap.set(date, current);
       });
       
-      console.log(`Finance stats generated for ${statsMap.size} days`);
-      return res.json(Array.from(statsMap.values()).sort((a: any, b: any) => b.date.localeCompare(a.date)));
+      const statsList = Array.from(statsMap.values()).map((s: any) => {
+        // Convert product_sales to a sorted Top 3 array
+        const top_products = Object.entries(s.product_sales)
+          .map(([name, count]) => ({ name, count }))
+          .sort((a: any, b: any) => b.count - a.count)
+          .slice(0, 3);
+          
+        const { product_sales, ...rest } = s;
+        return { ...rest, top_products };
+      });
+
+      console.log(`Finance stats generated for ${statsList.length} days`);
+      return res.json(statsList.sort((a: any, b: any) => b.date.localeCompare(a.date)));
     } catch (error) {
       console.error("Error fetching finance stats:", error);
       res.status(500).json({ error: "Internal server error fetching finance stats" });
