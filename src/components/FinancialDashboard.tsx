@@ -56,7 +56,8 @@ export default function FinancialDashboard() {
   const filteredStats = stats.filter(s => {
     const date = new Date(s.date + 'T00:00:00');
     const now = new Date();
-    const todayStr = now.toISOString().split('T')[0];
+    // Use local date in YYYY-MM-DD format (en-CA is stable for this)
+    const todayStr = now.toLocaleDateString('en-CA');
     
     if (filter === 'today') return s.date === todayStr;
     if (filter === 'all') return true;
@@ -99,7 +100,11 @@ export default function FinancialDashboard() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h2 className="text-3xl font-black text-stone-800 tracking-tight">Financeiro</h2>
-          <p className="text-stone-500 font-medium">Análise de desempenho e faturamento</p>
+          <p className="text-stone-500 font-medium">
+            {filter === 'today' 
+              ? `Vendas de Hoje - ${new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}` 
+              : 'Análise de desempenho e faturamento'}
+          </p>
         </div>
         
         <div className="flex bg-stone-100 p-1 rounded-2xl border border-stone-200 shadow-sm">
