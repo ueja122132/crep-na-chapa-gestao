@@ -56,10 +56,12 @@ export default function FinancialDashboard() {
   const filteredStats = stats.filter(s => {
     const date = new Date(s.date + 'T00:00:00');
     const now = new Date();
-    // Use Intl for todayStr to be 100% consistent with backend Sao Paulo time
+    // Shift local time back by 4 hours to match the "Business Day" closing time
+    // This ensures that at 1 AM, "Today" still refers to the previous calendar day
+    const businessNow = new Date(now.getTime() - (4 * 60 * 60 * 1000));
     const todayStr = new Intl.DateTimeFormat('fr-CA', { 
       timeZone: 'America/Sao_Paulo' 
-    }).format(now);
+    }).format(businessNow);
     
     if (filter === 'today') return s.date === todayStr;
     if (filter === 'all') return true;
@@ -104,7 +106,7 @@ export default function FinancialDashboard() {
           <h2 className="text-3xl font-black text-stone-800 tracking-tight">Financeiro</h2>
           <p className="text-stone-500 font-medium">
             {filter === 'today' 
-              ? `Vendas de Hoje - ${new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}` 
+              ? `Vendas de Hoje - ${new Date(new Date().getTime() - (4 * 60 * 60 * 1000)).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}` 
               : 'Análise de desempenho e faturamento'}
           </p>
         </div>

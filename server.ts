@@ -237,11 +237,11 @@ async function startServer() {
       // Manual grouping
       const statsMap = new Map();
       fallbackData.forEach((order: any) => {
-        // Explicitly get YYYY-MM-DD in America/Sao_Paulo time using Intl
-        // fr-CA locale consistently returns YYYY-MM-DD
-        const date = new Intl.DateTimeFormat('fr-CA', { 
-          timeZone: 'America/Sao_Paulo' 
-        }).format(new Date(order.created_at));
+        // Business Day Logic: Shift 6 hours back from UTC
+        // This ensures orders made until ~3 AM (Sao Paulo) are grouped with the previous day
+        const d = new Date(order.created_at);
+        const businessDay = new Date(d.getTime() - (6 * 60 * 60 * 1000));
+        const date = businessDay.toISOString().split('T')[0];
         
         const current = statsMap.get(date) || { 
           total_revenue: 0, 
