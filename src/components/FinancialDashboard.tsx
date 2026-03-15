@@ -35,7 +35,7 @@ import {
 export default function FinancialDashboard() {
   const [stats, setStats] = useState<FinanceStat[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<'all' | '7d' | '30d'>('all');
+  const [filter, setFilter] = useState<'today' | '7d' | '30d' | 'all'>('today');
 
   useEffect(() => {
     fetchStats();
@@ -54,9 +54,13 @@ export default function FinancialDashboard() {
   };
 
   const filteredStats = stats.filter(s => {
-    if (filter === 'all') return true;
-    const date = new Date(s.date);
+    const date = new Date(s.date + 'T00:00:00');
     const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+    
+    if (filter === 'today') return s.date === todayStr;
+    if (filter === 'all') return true;
+    
     const diff = (now.getTime() - date.getTime()) / (1000 * 3600 * 24);
     if (filter === '7d') return diff <= 7;
     if (filter === '30d') return diff <= 30;
@@ -99,9 +103,10 @@ export default function FinancialDashboard() {
         </div>
         
         <div className="flex bg-stone-100 p-1 rounded-2xl border border-stone-200 shadow-sm">
-          <FilterButton active={filter === 'all'} onClick={() => setFilter('all')}>Tudo</FilterButton>
+          <FilterButton active={filter === 'today'} onClick={() => setFilter('today')}>Hoje</FilterButton>
           <FilterButton active={filter === '7d'} onClick={() => setFilter('7d')}>7 dias</FilterButton>
           <FilterButton active={filter === '30d'} onClick={() => setFilter('30d')}>30 dias</FilterButton>
+          <FilterButton active={filter === 'all'} onClick={() => setFilter('all')}>Tudo</FilterButton>
         </div>
       </div>
 
@@ -112,7 +117,7 @@ export default function FinancialDashboard() {
           value={`R$ ${totalRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} 
           icon={<DollarSign className="w-6 h-6" />}
           color="bg-emerald-500"
-          trend="Total no período"
+          trend={filter === 'today' ? "Hoje" : filter === 'all' ? "Período Total" : `${filter.toUpperCase()} Recentes`}
           positive={true}
         />
         <StatCard 
@@ -120,7 +125,7 @@ export default function FinancialDashboard() {
           value={totalOrders.toString()} 
           icon={<ShoppingBag className="w-6 h-6" />}
           color="bg-orange-500"
-          trend="Concluídos"
+          trend={filter === 'today' ? "Hoje" : "Concluídos"}
           positive={true}
         />
         <StatCard 
