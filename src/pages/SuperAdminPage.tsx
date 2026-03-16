@@ -1,21 +1,28 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Building2, 
-  Users, 
   ShoppingBag, 
   TrendingUp, 
   Search, 
   AlertCircle, 
-  CheckCircle2, 
-  MoreVertical,
   Shield,
   CreditCard,
   Lock,
   Unlock,
-  ChevronRight,
   Loader2,
-  Filter
+  Filter,
+  CheckCircle2,
+  XCircle,
+  RefreshCw,
+  Settings,
+  Globe,
+  Zap,
+  BarChart3,
+  Users,
+  ArrowUpRight,
+  ArrowDownRight,
+  ChevronDown
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -36,16 +43,20 @@ interface RankingItem {
   total_orders: number;
 }
 
-interface GlobalStats extends GlobalStatsBase {
-  average_ticket: number;
-}
-
-interface GlobalStatsBase {
+interface GlobalStats {
   total_revenue: number;
   total_orders: number;
   active_stores: number;
   total_stores: number;
+  average_ticket: number;
 }
+
+const PLAN_LABELS: Record<string, string> = { basic: 'Basic', pro: 'Pro', enterprise: 'Enterprise' };
+const PLAN_COLORS: Record<string, string> = {
+  basic: 'bg-stone-700 text-stone-300',
+  pro: 'bg-blue-500/20 text-blue-300 border border-blue-500/30',
+  enterprise: 'bg-purple-500/20 text-purple-300 border border-purple-500/30',
+};
 
 export default function SuperAdminPage() {
   const { session } = useAuth();
@@ -58,19 +69,20 @@ export default function SuperAdminPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPlan, setSelectedPlan] = useState<string>('all');
   const [error, setError] = useState<string | null>(null);
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchData();
-  }, [activeTab]);
+  useEffect(() => { fetchData(); }, [activeTab]);
+
+  const headers = { 'Authorization': `Bearer ${session?.access_token}`, 'Content-Type': 'application/json' };
 
   const fetchData = async () => {
     setLoading(true);
     setError(null);
     try {
-      const headers = { 'Authorization': `Bearer ${session?.access_token}` };
-      
       const statsRes = await fetch('/api/admin/stats', { headers });
       const statsData = await statsRes.json();
+      if (!statsRes.ok) throw new Error(statsData.error || 'Erro ao carregar stats');
       setStats(statsData);
 
       if (activeTab === 'dashboard') {
@@ -82,6 +94,7 @@ export default function SuperAdminPage() {
       if (activeTab === 'stores') {
         const storesRes = await fetch('/api/admin/organizations', { headers });
         const storesData = await storesRes.json();
+        if (!storesRes.ok) throw new Error(storesData.error || 'Erro ao carregar lojas');
         setStores(storesData);
       }
 
@@ -97,446 +110,388 @@ export default function SuperAdminPage() {
     }
   };
 
+  const showSuccess = (msg: string) => {
+    setSuccessMsg(msg);
+    setTimeout(() => setSuccessMsg(null), 3000);
+  };
+
   const handleUpdateStore = async (id: string, updates: Partial<StoreMetric>) => {
+    setUpdatingId(id);
     try {
       const res = await fetch(`/api/admin/organizations/${id}`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token}`
-        },
+        headers,
         body: JSON.stringify(updates)
       });
-      
       if (!res.ok) {
-        let errorMsg = `Erro ${res.status}`;
-        try {
-          const errorData = await res.json();
-          errorMsg = errorData.error || errorData.message || JSON.stringify(errorData);
-        } catch (e) {
-          const text = await res.text().catch(() => '');
-          if (text) errorMsg += `: ${text.slice(0, 100)}`;
-        }
-        throw new Error(errorMsg);
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `Erro ${res.status}`);
       }
-      
       setStores(stores.map(s => s.id === id ? { ...s, ...updates } : s));
+      const action = updates.status === 'active' ? 'ativada' : updates.status === 'inactive' ? 'suspensa' : 'atualizada';
+      showSuccess(`Loja ${action} com sucesso!`);
     } catch (err: any) {
-      alert(err.message);
+      setError(err.message);
+    } finally {
+      setUpdatingId(null);
     }
   };
 
   const updateConfig = async (key: string, value: string) => {
     try {
-      await fetch('/api/admin/config', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token}`
-        },
-        body: JSON.stringify({ key, value })
-      });
+      await fetch('/api/admin/config', { method: 'POST', headers, body: JSON.stringify({ key, value }) });
       fetchData();
-    } catch (err) {
-      alert('Erro ao atualizar configuração');
+      showSuccess('Configuração salva!');
+    } catch {
+      setError('Erro ao atualizar configuração');
     }
   };
 
   const filteredStores = stores.filter(store => {
-    const matchesSearch = store.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                         store.slug.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = store.name.toLowerCase().includes(searchTerm.toLowerCase()) || store.slug.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesPlan = selectedPlan === 'all' || store.plan === selectedPlan;
     return matchesSearch && matchesPlan;
   });
 
+  const activeCount = stores.filter(s => s.status === 'active').length;
+  const inactiveCount = stores.filter(s => s.status !== 'active').length;
+
   if (loading && !stats) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-        <Loader2 className="w-10 h-10 text-orange-500 animate-spin" />
-        <p className="text-stone-400 font-medium animate-pulse">Carregando inteligência global...</p>
+        <Loader2 className="w-10 h-10 text-indigo-500 animate-spin" />
+        <p className="text-stone-400 font-medium animate-pulse">Carregando dados globais...</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-8 pb-20">
-      {/* Header Administrativo */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+    <div className="space-y-6 pb-20">
+
+      {/* Notificações */}
+      <AnimatePresence>
+        {successMsg && (
+          <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
+            className="fixed top-6 right-6 z-50 bg-green-500 text-white px-6 py-3 rounded-2xl flex items-center gap-2 shadow-xl font-bold text-sm">
+            <CheckCircle2 className="w-4 h-4" /> {successMsg}
+          </motion.div>
+        )}
+        {error && (
+          <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }}
+            className="bg-red-500/10 border border-red-500/20 text-red-400 p-4 rounded-2xl flex items-center gap-3">
+            <AlertCircle className="w-5 h-5 flex-shrink-0" />
+            <p className="font-medium text-sm flex-1">{error}</p>
+            <button onClick={() => setError(null)}><XCircle className="w-4 h-4" /></button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-black text-white tracking-tight">SaaS Command Center</h1>
-          <p className="text-stone-400 font-medium">Controle total da infraestrutura e faturamento</p>
+          <h1 className="text-2xl font-black text-white tracking-tight">SaaS Command Center</h1>
+          <p className="text-stone-500 text-sm font-medium">Controle total da infraestrutura e faturamento</p>
         </div>
-        <div className="flex items-center gap-3">
-          <button 
-            onClick={fetchData}
-            className="flex items-center gap-2 bg-stone-900 border border-stone-800 text-stone-300 px-5 py-2.5 rounded-2xl text-sm font-bold hover:bg-stone-800 hover:text-white transition-all active:scale-95 shadow-lg"
-          >
-            Sincronizar Dados
-          </button>
-        </div>
+        <button onClick={fetchData}
+          className="flex items-center gap-2 bg-stone-800 border border-stone-700 text-stone-300 px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-stone-700 transition-all active:scale-95">
+          <RefreshCw className="w-4 h-4" /> Sincronizar
+        </button>
       </div>
 
-      {/* Navegação por Abas */}
-      <div className="flex items-center gap-2 p-1.5 bg-stone-900/50 border border-stone-800 rounded-3xl w-fit">
+      {/* Tabs */}
+      <div className="flex items-center gap-1 p-1 bg-stone-900/60 border border-stone-800 rounded-2xl w-fit">
         {[
-          { id: 'dashboard', label: 'Estatísticas', icon: <TrendingUp className="w-4 h-4" /> },
-          { id: 'stores', label: 'Loja & Unidades', icon: <Building2 className="w-4 h-4" /> },
-          { id: 'config', label: 'Sistema & Root', icon: <Shield className="w-4 h-4" /> }
+          { id: 'dashboard', label: 'Visão Geral', icon: <BarChart3 className="w-4 h-4" /> },
+          { id: 'stores', label: 'Lojas', icon: <Building2 className="w-4 h-4" /> },
+          { id: 'config', label: 'Sistema', icon: <Settings className="w-4 h-4" /> }
         ].map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id as any)}
-            className={`flex items-center gap-2 px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${
-              activeTab === tab.id 
-                ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20' 
-                : 'text-stone-500 hover:text-stone-300'
-            }`}
-          >
-            {tab.icon}
-            {tab.label}
+          <button key={tab.id} onClick={() => setActiveTab(tab.id as any)}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+              activeTab === tab.id ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20' : 'text-stone-500 hover:text-stone-300'
+            }`}>
+            {tab.icon}{tab.label}
           </button>
         ))}
       </div>
 
-      {error && (
-        <motion.div 
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          className="bg-red-500/10 border border-red-500/20 text-red-400 p-4 rounded-2xl flex items-center gap-3"
-        >
-          <AlertCircle className="w-5 h-5 flex-shrink-0" />
-          <p className="font-medium text-sm">{error}</p>
-        </motion.div>
-      )}
-
+      {/* ===== DASHBOARD TAB ===== */}
       {activeTab === 'dashboard' && (
-        <div className="space-y-8">
-          {/* Global Stats - Premium Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <StatsCard 
-              title="Receita bruta" 
-              value={`R$ ${(stats?.total_revenue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-              subtitle="Volume total processado"
-              icon={<CreditCard className="w-6 h-6" />}
-              color="blue"
-            />
-            <StatsCard 
-              title="Ticket Médio" 
-              value={`R$ ${(stats?.average_ticket || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-              subtitle="Valor por transação"
-              icon={<TrendingUp className="w-6 h-6" />}
-              color="purple"
-            />
-            <StatsCard 
-              title="Pedidos Totais" 
-              value={(stats?.total_orders || 0).toLocaleString() || '0'}
-              subtitle="Transações em toda rede"
-              icon={<ShoppingBag className="w-6 h-6" />}
-              color="orange"
-            />
-            <StatsCard 
-              title="Lojas Ativas" 
-              value={`${stats?.active_stores || 0} / ${stats?.total_stores || 0}`}
-              subtitle={`${stats?.total_stores ? Math.round((stats.active_stores / stats.total_stores) * 100) : 0}% de engajamento`}
-              icon={<Building2 className="w-6 h-6" />}
-              color="green"
-            />
+        <div className="space-y-6">
+          {/* KPI Cards */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <KpiCard title="Receita Bruta" value={`R$ ${(stats?.total_revenue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} sub="Volume processado" icon={<CreditCard className="w-5 h-5" />} color="blue" />
+            <KpiCard title="Ticket Médio" value={`R$ ${(stats?.average_ticket || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} sub="Por transação" icon={<TrendingUp className="w-5 h-5" />} color="purple" />
+            <KpiCard title="Pedidos Totais" value={(stats?.total_orders || 0).toString()} sub="Em toda a rede" icon={<ShoppingBag className="w-5 h-5" />} color="orange" />
+            <KpiCard title="Lojas Ativas" value={`${stats?.active_stores || 0} / ${stats?.total_stores || 0}`} sub={`${stats?.total_stores ? Math.round((stats.active_stores / stats.total_stores) * 100) : 0}% engajamento`} icon={<Building2 className="w-5 h-5" />} color="green" />
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-             <div className="bg-stone-900/50 p-8 rounded-[2.5rem] border border-stone-800 shadow-2xl">
-                <h3 className="text-sm font-black text-white uppercase tracking-widest mb-6">Ranking de Lojas (Faturamento)</h3>
-                <div className="space-y-4">
-                  {ranking.map((item, idx) => (
-                    <div key={idx} className="flex items-center justify-between p-4 bg-stone-950/50 rounded-2xl border border-stone-900 group">
-                      <div className="flex items-center gap-4">
-                        <span className="text-stone-700 font-black italic text-xl w-6">#{idx + 1}</span>
-                        <div>
-                          <p className="font-bold text-stone-200 group-hover:text-orange-500 transition-colors uppercase text-sm tracking-tight">{item.name}</p>
-                          <p className="text-[10px] text-stone-500 font-bold uppercase">{item.total_orders} pedidos realizados</p>
+          {/* Saúde da Rede */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-green-500/10 border border-green-500/20 rounded-2xl p-5 flex items-center gap-4">
+              <div className="w-10 h-10 bg-green-500 rounded-xl flex items-center justify-center"><CheckCircle2 className="w-5 h-5 text-white" /></div>
+              <div><p className="text-xs text-stone-400 font-bold uppercase">Lojas Operantes</p><p className="text-2xl font-black text-white">{activeCount}</p></div>
+            </div>
+            <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-5 flex items-center gap-4">
+              <div className="w-10 h-10 bg-red-500 rounded-xl flex items-center justify-center"><Lock className="w-5 h-5 text-white" /></div>
+              <div><p className="text-xs text-stone-400 font-bold uppercase">Lojas Suspensas</p><p className="text-2xl font-black text-white">{inactiveCount}</p></div>
+            </div>
+            <div className="bg-indigo-500/10 border border-indigo-500/20 rounded-2xl p-5 flex items-center gap-4">
+              <div className="w-10 h-10 bg-indigo-500 rounded-xl flex items-center justify-center"><Globe className="w-5 h-5 text-white" /></div>
+              <div><p className="text-xs text-stone-400 font-bold uppercase">Total na Rede</p><p className="text-2xl font-black text-white">{stats?.total_stores || 0}</p></div>
+            </div>
+          </div>
+
+          {/* Ranking + Performance */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="bg-stone-900/50 p-6 rounded-3xl border border-stone-800">
+              <h3 className="text-xs font-black text-white uppercase tracking-widest mb-5 flex items-center gap-2"><BarChart3 className="w-4 h-4 text-indigo-400" /> Ranking de Faturamento</h3>
+              <div className="space-y-3">
+                {ranking.map((item, idx) => (
+                  <div key={idx} className="flex items-center justify-between p-4 bg-stone-950/60 rounded-2xl border border-stone-900 hover:border-stone-700 transition-all group">
+                    <div className="flex items-center gap-3">
+                      <span className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black ${idx === 0 ? 'bg-yellow-500 text-white' : idx === 1 ? 'bg-stone-400 text-stone-900' : 'bg-stone-700 text-stone-400'}`}>#{idx + 1}</span>
+                      <div>
+                        <p className="font-bold text-stone-200 group-hover:text-indigo-400 transition-colors text-sm">{item.name}</p>
+                        <p className="text-[10px] text-stone-500 font-bold">{item.total_orders} pedidos</p>
+                      </div>
+                    </div>
+                    <p className="font-black text-white">R$ {item.total_sales.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                  </div>
+                ))}
+                {ranking.length === 0 && <p className="text-stone-600 text-center py-10 font-bold uppercase text-xs">Sem dados de ranking</p>}
+              </div>
+            </div>
+
+            <div className="bg-stone-900/50 p-6 rounded-3xl border border-stone-800">
+              <h3 className="text-xs font-black text-white uppercase tracking-widest mb-5 flex items-center gap-2"><Zap className="w-4 h-4 text-orange-400" /> Performance por Unidade</h3>
+              <div className="space-y-3">
+                {ranking.map((item, idx) => {
+                  const totalRevenue = ranking.reduce((acc, r) => acc + r.total_sales, 0);
+                  const sharePercent = totalRevenue > 0 ? Math.round((item.total_sales / totalRevenue) * 100) : 0;
+                  const barColors = ['bg-orange-500', 'bg-blue-500', 'bg-purple-500', 'bg-green-500'];
+                  const barColor = barColors[idx % barColors.length];
+                  const ticketMedio = item.total_orders > 0 ? item.total_sales / item.total_orders : 0;
+                  return (
+                    <div key={idx} className="p-4 bg-stone-950/60 rounded-2xl border border-stone-900">
+                      <div className="flex justify-between items-center mb-2">
+                        <div className="flex items-center gap-2">
+                          <div className={`w-7 h-7 ${barColor} rounded-lg flex items-center justify-center text-white font-black text-xs`}>{item.name.charAt(0)}</div>
+                          <div>
+                            <p className="font-bold text-white text-sm">{item.name}</p>
+                            <p className="text-[10px] text-stone-500">{item.total_orders} pedidos · ticket R$ {ticketMedio.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-black text-white">R$ {item.total_sales.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                          <p className="text-[10px] text-stone-500 font-bold">{sharePercent}% do total</p>
                         </div>
                       </div>
-                      <p className="font-black text-white">R$ {item.total_sales.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                      <div className="w-full bg-stone-800 rounded-full h-1">
+                        <div className={`${barColor} h-1 rounded-full`} style={{ width: `${sharePercent}%` }} />
+                      </div>
                     </div>
-                  ))}
-                  {ranking.length === 0 && <p className="text-stone-600 text-center py-10 font-bold uppercase text-xs">Nenhum dado de ranking disponível</p>}
-                </div>
-             </div>
-
-             {/* Performance detalhada por unidade */}
-             <div className="space-y-4">
-               <h3 className="text-sm font-black text-white uppercase tracking-widest">Performance por Unidade</h3>
-               {ranking.length === 0 && (
-                 <div className="bg-stone-900/50 p-8 rounded-[2.5rem] border border-stone-800 flex items-center justify-center">
-                   <p className="text-stone-600 font-bold uppercase text-xs">Sem dados de unidades</p>
-                 </div>
-               )}
-               {ranking.map((item, idx) => {
-                 const totalRevenue = ranking.reduce((acc, r) => acc + r.total_sales, 0);
-                 const sharePercent = totalRevenue > 0 ? Math.round((item.total_sales / totalRevenue) * 100) : 0;
-                 const gradients = ['from-orange-600/20 border-orange-500/20', 'from-blue-600/20 border-blue-500/20', 'from-purple-600/20 border-purple-500/20', 'from-green-600/20 border-green-500/20'];
-                 const barColors = ['bg-orange-500', 'bg-blue-500', 'bg-purple-500', 'bg-green-500'];
-                 const gradient = gradients[idx % gradients.length];
-                 const barColor = barColors[idx % barColors.length];
-                 const ticketMedio = item.total_orders > 0 ? item.total_sales / item.total_orders : 0;
-                 return (
-                   <div key={idx} className={`bg-gradient-to-br ${gradient} to-stone-950 p-6 rounded-3xl border shadow-xl`}>
-                     <div className="flex items-center justify-between mb-3">
-                       <div className="flex items-center gap-3">
-                         <div className={`w-10 h-10 rounded-2xl ${barColor} flex items-center justify-center font-black text-white text-sm shadow-lg`}>
-                           {item.name.charAt(0)}
-                         </div>
-                         <div>
-                           <p className="font-black text-white uppercase text-sm tracking-tight">{item.name}</p>
-                           <p className="text-[10px] text-stone-400 font-bold">{sharePercent}% do faturamento total</p>
-                         </div>
-                       </div>
-                       <div className="text-right">
-                         <p className="font-black text-white text-lg">R$ {item.total_sales.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-                         <p className="text-[10px] text-stone-400 font-bold">{item.total_orders} pedidos · ticket R$ {ticketMedio.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-                       </div>
-                     </div>
-                     <div className="w-full bg-stone-800/60 rounded-full h-1.5 mt-4">
-                       <div className={`${barColor} h-1.5 rounded-full transition-all duration-1000`} style={{ width: `${sharePercent}%` }} />
-                     </div>
-                   </div>
-                 );
-               })}
-             </div>
+                  );
+                })}
+                {ranking.length === 0 && <p className="text-stone-600 text-center py-10 font-bold uppercase text-xs">Sem dados de performance</p>}
+              </div>
+            </div>
           </div>
         </div>
       )}
 
+      {/* ===== STORES TAB ===== */}
       {activeTab === 'stores' && (
-        <div className="bg-stone-900/50 backdrop-blur-sm rounded-[2.5rem] border border-stone-800 overflow-hidden shadow-2xl">
-          <div className="p-8 border-b border-stone-800 flex flex-col md:flex-row gap-4 justify-between items-center bg-stone-900/30">
-            <div className="relative w-full md:w-96">
+        <div className="space-y-4">
+          {/* Filtros */}
+          <div className="flex flex-col md:flex-row gap-3">
+            <div className="relative flex-1">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-500" />
-              <input 
-                type="text" 
-                placeholder="Buscar unidade por nome ou ID..." 
-                className="w-full pl-11 pr-4 py-4 bg-stone-950 border border-stone-800 rounded-2xl text-sm text-stone-200 focus:outline-none focus:ring-2 focus:ring-orange-500/40 transition-all font-medium placeholder:text-stone-600 shadow-inner"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
+              <input type="text" placeholder="Buscar loja por nome ou ID..."
+                className="w-full pl-11 pr-4 py-3 bg-stone-900 border border-stone-800 rounded-xl text-sm text-stone-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 transition-all placeholder:text-stone-600"
+                value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
             </div>
-            
-            <div className="flex items-center gap-2 w-full md:w-auto">
-              <div className="bg-stone-950 p-2 rounded-2xl border border-stone-800 flex items-center gap-1 shadow-inner">
-                <Filter className="w-4 h-4 text-stone-500 ml-2" />
-                <select 
-                  className="bg-transparent border-none text-[10px] font-black uppercase tracking-widest py-1.5 px-4 focus:ring-0 text-stone-300 cursor-pointer"
-                  value={selectedPlan}
-                  onChange={(e) => setSelectedPlan(e.target.value)}
-                >
-                  <option value="all">Filtro: Todos os Planos</option>
-                  <option value="basic">Plano Basic</option>
-                  <option value="pro">Plano Pro</option>
-                  <option value="enterprise">Enterprise</option>
-                </select>
-              </div>
+            <div className="flex items-center gap-2">
+              <Filter className="w-4 h-4 text-stone-500" />
+              <select className="bg-stone-900 border border-stone-800 text-stone-300 text-xs font-black uppercase tracking-widest py-3 px-4 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                value={selectedPlan} onChange={(e) => setSelectedPlan(e.target.value)}>
+                <option value="all">Todos os Planos</option>
+                <option value="basic">Basic</option>
+                <option value="pro">Pro</option>
+                <option value="enterprise">Enterprise</option>
+              </select>
             </div>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead>
-                <tr className="bg-stone-900/40 text-stone-500 text-[10px] font-black uppercase tracking-[0.2em]">
-                  <th className="px-8 py-6">Identidade Visual / Loja</th>
-                  <th className="px-8 py-6">Assinatura / Status</th>
-                  <th className="px-8 py-6 text-center">Volume</th>
-                  <th className="px-8 py-6 text-right">Performace (R$)</th>
-                  <th className="px-8 py-6 text-right">Ações de Root</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-stone-800/50">
-                {filteredStores.map((store) => (
-                  <tr key={store.id} className="hover:bg-white/[0.02] transition-colors group">
-                    <td className="px-8 py-6">
-                      <div className="flex items-center gap-4">
-                        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center font-black text-xl shadow-inner ${
-                          store.status === 'active' ? 'bg-orange-500 text-white' : 'bg-stone-800 text-stone-500'
-                        }`}>
-                          {store.name.charAt(0)}
-                        </div>
-                        <div>
-                          <p className="font-bold text-stone-100 group-hover:text-orange-400 transition-colors uppercase tracking-tight">{store.name}</p>
-                          <p className="text-[10px] text-stone-500 font-mono tracking-tighter">ID: {store.slug}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-8 py-6">
-                      <div className="space-y-1.5">
-                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
-                          store.status === 'active' ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'
-                        }`}>
-                          <div className={`w-1.5 h-1.5 rounded-full ${store.status === 'active' ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
-                          {store.status === 'active' ? 'Operante' : 'Suspenso'}
-                        </span>
-                        <div className="flex items-center gap-1 text-[10px] font-black text-stone-500 uppercase tracking-widest pl-1">
-                          <Shield className="w-3 h-3 text-orange-500/60" />
-                          <span>{store.plan}</span>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-8 py-6 text-center">
-                      <div className="bg-stone-950 p-3 rounded-2xl border border-stone-800 inline-block shadow-inner min-w-[50px]">
-                        <span className="font-mono font-black text-stone-200 text-sm">{store.total_orders}</span>
-                      </div>
-                    </td>
-                    <td className="px-8 py-6 text-right">
-                      <p className="font-black text-white text-xl tracking-tighter">
-                        R$ {store.total_sales.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                      </p>
-                    </td>
-                    <td className="px-8 py-6 text-right">
-                      <div className="flex items-center justify-end gap-3 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-x-2 group-hover:translate-x-0">
-                        <select 
-                          className="text-[10px] font-black bg-stone-950 border border-stone-800 text-stone-300 rounded-xl px-4 py-2 focus:ring-2 focus:ring-orange-500 focus:outline-none uppercase tracking-widest"
-                          value={store.plan}
-                          onChange={(e) => handleUpdateStore(store.id, { plan: e.target.value as any })}
-                        >
-                          <option value="basic">BASIC</option>
-                          <option value="pro">PRO</option>
-                          <option value="enterprise">ENTERPRISE</option>
-                        </select>
+          {/* Contadores rápidos */}
+          <div className="flex items-center gap-3 text-xs font-bold">
+            <span className="text-stone-400">{filteredStores.length} loja(s) encontrada(s)</span>
+            <span className="w-1 h-1 bg-stone-700 rounded-full" />
+            <span className="text-green-400">{activeCount} ativas</span>
+            <span className="w-1 h-1 bg-stone-700 rounded-full" />
+            <span className="text-red-400">{inactiveCount} suspensas</span>
+          </div>
 
-                        <button 
-                          onClick={() => handleUpdateStore(store.id, { 
-                            status: store.status === 'active' ? 'inactive' : 'active' 
-                          })}
-                          className={`p-3 rounded-xl transition-all border ${
-                            store.status === 'active' 
-                              ? 'bg-red-500/10 border-red-500/20 text-red-500 hover:bg-red-500 hover:text-white' 
-                              : 'bg-green-500/10 border-green-500/20 text-green-500 hover:bg-green-500 hover:text-white'
-                          }`}
-                          title={store.status === 'active' ? 'Congelar Unidade' : 'Ativar Unidade'}
-                        >
-                          {store.status === 'active' ? <Lock className="w-5 h-5" /> : <Unlock className="w-5 h-5" />}
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            
+          {/* Cards de lojas */}
+          <div className="space-y-3">
+            {filteredStores.map((store) => (
+              <motion.div key={store.id} layout
+                className={`bg-stone-900/50 border rounded-2xl p-5 flex flex-col md:flex-row md:items-center gap-4 transition-all ${
+                  store.status === 'active' ? 'border-stone-800' : 'border-red-500/20 bg-red-500/5'
+                }`}>
+                
+                {/* Avatar + Info */}
+                <div className="flex items-center gap-4 flex-1">
+                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-black text-xl shadow-inner flex-shrink-0 ${
+                    store.status === 'active' ? 'bg-indigo-600 text-white' : 'bg-stone-800 text-stone-500'
+                  }`}>
+                    {store.name.charAt(0)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2 mb-1">
+                      <p className="font-black text-white uppercase tracking-tight text-sm">{store.name}</p>
+                      <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${PLAN_COLORS[store.plan] || PLAN_COLORS.basic}`}>
+                        {PLAN_LABELS[store.plan] || store.plan}
+                      </span>
+                      <span className={`flex items-center gap-1 text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${
+                        store.status === 'active' ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'
+                      }`}>
+                        <div className={`w-1.5 h-1.5 rounded-full ${store.status === 'active' ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
+                        {store.status === 'active' ? 'Operante' : 'Suspensa'}
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-stone-500 font-mono">ID: {store.slug}</p>
+                  </div>
+                </div>
+
+                {/* Métricas */}
+                <div className="flex items-center gap-6 text-center">
+                  <div>
+                    <p className="text-xs text-stone-500 font-bold uppercase mb-1">Pedidos</p>
+                    <p className="font-black text-white">{store.total_orders}</p>
+                  </div>
+                  <div className="w-px h-8 bg-stone-800" />
+                  <div>
+                    <p className="text-xs text-stone-500 font-bold uppercase mb-1">Faturamento</p>
+                    <p className="font-black text-white">R$ {(store.total_sales || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                  </div>
+                </div>
+
+                {/* Ações */}
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {/* Mudar plano */}
+                  <div className="relative">
+                    <select
+                      className="appearance-none bg-stone-800 border border-stone-700 text-stone-300 text-[10px] font-black uppercase tracking-widest py-2.5 pl-3 pr-8 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none cursor-pointer"
+                      value={store.plan}
+                      onChange={(e) => handleUpdateStore(store.id, { plan: e.target.value as any })}
+                      disabled={updatingId === store.id}>
+                      <option value="basic">Basic</option>
+                      <option value="pro">Pro</option>
+                      <option value="enterprise">Enterprise</option>
+                    </select>
+                    <ChevronDown className="w-3 h-3 text-stone-500 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  </div>
+
+                  {/* Ativar / Suspender */}
+                  <button
+                    onClick={() => handleUpdateStore(store.id, { status: store.status === 'active' ? 'inactive' : 'active' })}
+                    disabled={updatingId === store.id}
+                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider transition-all active:scale-95 disabled:opacity-50 ${
+                      store.status === 'active'
+                        ? 'bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500 hover:text-white'
+                        : 'bg-green-500/10 border border-green-500/30 text-green-400 hover:bg-green-500 hover:text-white'
+                    }`}
+                    title={store.status === 'active' ? 'Suspender loja' : 'Ativar loja'}>
+                    {updatingId === store.id
+                      ? <Loader2 className="w-4 h-4 animate-spin" />
+                      : store.status === 'active'
+                        ? <><Lock className="w-3.5 h-3.5" /> Suspender</>
+                        : <><Unlock className="w-3.5 h-3.5" /> Ativar</>
+                    }
+                  </button>
+                </div>
+              </motion.div>
+            ))}
+
             {filteredStores.length === 0 && (
-              <div className="py-32 text-center bg-stone-900/10">
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                >
-                  <Building2 className="w-20 h-20 text-stone-800 mx-auto mb-6 border border-stone-800 p-5 rounded-3xl" />
-                  <p className="text-stone-600 font-bold uppercase tracking-[0.3em] text-[10px]">Nenhuma unidade detectada na rede</p>
-                </motion.div>
+              <div className="py-20 text-center">
+                <Building2 className="w-16 h-16 text-stone-800 mx-auto mb-4 border border-stone-800 p-4 rounded-2xl" />
+                <p className="text-stone-600 font-bold uppercase tracking-widest text-xs">Nenhuma loja encontrada</p>
               </div>
             )}
           </div>
         </div>
       )}
 
+      {/* ===== CONFIG TAB ===== */}
       {activeTab === 'config' && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-           <div className="bg-stone-900/50 p-8 rounded-[2.5rem] border border-stone-800 shadow-2xl">
-              <h3 className="text-sm font-black text-white uppercase tracking-widest mb-8 border-b border-stone-800 pb-4">Configurações Globais</h3>
-              <div className="space-y-8">
-                <div className="space-y-4">
-                  <label className="text-[10px] font-black text-stone-500 uppercase tracking-widest ml-1">Banner Global do Sistema</label>
-                  <div className="flex items-center gap-3">
-                    <input 
-                      type="text" 
-                      placeholder="Ex: Manutenção agendada para 02:00" 
-                      className="flex-1 bg-stone-950 border border-stone-800 p-4 rounded-2xl text-sm font-bold text-white focus:outline-none focus:ring-2 focus:ring-orange-500/40"
-                      value={config.find(c => c.key === 'global_banner')?.value || ''}
-                      onChange={(e) => {
-                        const newVal = e.target.value;
-                        updateConfig('global_banner', newVal);
-                      }}
-                    />
-                  </div>
-                  <p className="text-[10px] text-stone-600 font-bold uppercase ml-1">Este aviso aparecerá no topo de todas as lojas logadas.</p>
-                </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="bg-stone-900/50 p-6 rounded-3xl border border-stone-800 space-y-6">
+            <h3 className="text-xs font-black text-white uppercase tracking-widest border-b border-stone-800 pb-4">Configurações Globais</h3>
 
-                <div className="space-y-4">
-                  <label className="text-[10px] font-black text-stone-500 uppercase tracking-widest ml-1">Modo de Manutenção (Plataforma)</label>
-                  <div className="flex items-center gap-4 p-5 bg-stone-950 rounded-2xl border border-stone-900">
-                    <div className="flex-1">
-                      <p className="font-bold text-stone-200">Travar Pedidos</p>
-                      <p className="text-[10px] text-stone-500 font-bold uppercase">Impedido novos pedidos em toda rede</p>
-                    </div>
-                    <button 
-                      onClick={() => {
-                        const current = config.find(c => c.key === 'maintenance_mode')?.value === 'true';
-                        updateConfig('maintenance_mode', (!current).toString());
-                      }}
-                      className={`w-14 h-8 rounded-full relative transition-all ${
-                        config.find(c => c.key === 'maintenance_mode')?.value === 'true' ? 'bg-orange-500' : 'bg-stone-800'
-                      }`}
-                    >
-                      <div className={`absolute top-1 w-6 h-6 bg-white rounded-full transition-all shadow-lg ${
-                        config.find(c => c.key === 'maintenance_mode')?.value === 'true' ? 'left-7' : 'left-1'
-                      }`} />
-                    </button>
-                  </div>
-                </div>
-              </div>
-           </div>
+            {/* Banner global */}
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-stone-500 uppercase tracking-widest">Banner Global do Sistema</label>
+              <input type="text" placeholder="Ex: Manutenção agendada para 02:00"
+                className="w-full bg-stone-950 border border-stone-800 p-3.5 rounded-xl text-sm font-bold text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+                defaultValue={config.find(c => c.key === 'global_banner')?.value || ''}
+                onBlur={(e) => updateConfig('global_banner', e.target.value)} />
+              <p className="text-[10px] text-stone-600 font-bold">Aparecerá no topo de todas as lojas logadas.</p>
+            </div>
 
-           <div className="bg-stone-900/50 p-8 rounded-[2.5rem] border border-stone-800 shadow-2xl flex flex-col justify-center items-center text-center">
-              <div className="w-20 h-20 bg-stone-950 rounded-3xl flex items-center justify-center border border-stone-900 mb-6 group hover:border-orange-500 transition-colors">
-                 <Shield className="w-10 h-10 text-stone-700 group-hover:text-orange-500 transition-colors" />
+            {/* Modo manutenção */}
+            <div className="flex items-center justify-between p-4 bg-stone-950 rounded-xl border border-stone-900">
+              <div>
+                <p className="font-bold text-stone-200 text-sm">Modo de Manutenção</p>
+                <p className="text-[10px] text-stone-500 font-bold uppercase">Bloqueia novos pedidos em toda a rede</p>
               </div>
-              <h3 className="text-xl font-black text-white uppercase tracking-tight mb-2">Segurança Root</h3>
-              <p className="text-stone-400 font-medium max-w-sm">Estas configurações alteram o comportamento básico da infraestrutura. Use com cautela cautela total.</p>
-           </div>
+              <button
+                onClick={() => {
+                  const current = config.find(c => c.key === 'maintenance_mode')?.value === 'true';
+                  updateConfig('maintenance_mode', (!current).toString());
+                }}
+                className={`w-12 h-6 rounded-full relative transition-all ${config.find(c => c.key === 'maintenance_mode')?.value === 'true' ? 'bg-orange-500' : 'bg-stone-700'}`}>
+                <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full transition-all shadow-lg ${config.find(c => c.key === 'maintenance_mode')?.value === 'true' ? 'left-6' : 'left-0.5'}`} />
+              </button>
+            </div>
+          </div>
+
+          {/* Info de segurança */}
+          <div className="bg-gradient-to-br from-indigo-600/10 to-stone-950 p-6 rounded-3xl border border-indigo-500/20 flex flex-col justify-between">
+            <div>
+              <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center mb-4 shadow-lg shadow-indigo-500/30">
+                <Shield className="w-6 h-6 text-white" />
+              </div>
+              <h3 className="text-lg font-black text-white uppercase mb-2">Acesso Root</h3>
+              <p className="text-stone-400 text-sm leading-relaxed">Estas configurações afetam toda a infraestrutura da plataforma. Altere com cautela.</p>
+            </div>
+            <div className="mt-6 space-y-2 text-xs font-bold text-stone-500">
+              <div className="flex items-center gap-2"><CheckCircle2 className="w-3.5 h-3.5 text-green-500" /> Autenticação JWT ativa</div>
+              <div className="flex items-center gap-2"><CheckCircle2 className="w-3.5 h-3.5 text-green-500" /> Supabase RLS habilitado</div>
+              <div className="flex items-center gap-2"><CheckCircle2 className="w-3.5 h-3.5 text-green-500" /> Multi-tenant isolado</div>
+            </div>
+          </div>
         </div>
       )}
     </div>
   );
 }
 
-function StatsCard({ title, value, subtitle, icon, color }: { 
-  title: string; 
-  value: string; 
-  subtitle: string; 
-  icon: React.ReactNode;
-  color: 'blue' | 'orange' | 'green' | 'purple';
-}) {
-  const colors = {
-    blue: 'from-blue-600/20 to-blue-600/5 text-blue-400 border-blue-500/20',
-    orange: 'from-orange-600/20 to-orange-600/5 text-orange-400 border-orange-500/20',
-    green: 'from-green-600/20 to-green-600/5 text-green-400 border-green-500/20',
-    purple: 'from-fuchsia-600/20 to-fuchsia-600/5 text-fuchsia-400 border-fuchsia-500/20'
+// Componente KPI Card
+function KpiCard({ title, value, sub, icon, color }: { title: string; value: string; sub: string; icon: React.ReactNode; color: 'blue' | 'orange' | 'green' | 'purple' }) {
+  const styles = {
+    blue: { card: 'from-blue-600/15 border-blue-500/20', icon: 'bg-blue-500 shadow-blue-500/30' },
+    orange: { card: 'from-orange-600/15 border-orange-500/20', icon: 'bg-orange-500 shadow-orange-500/30' },
+    green: { card: 'from-green-600/15 border-green-500/20', icon: 'bg-green-500 shadow-green-500/30' },
+    purple: { card: 'from-purple-600/15 border-purple-500/20', icon: 'bg-purple-500 shadow-purple-500/30' },
   };
-
-  const iconColors = {
-    blue: 'bg-blue-500 shadow-blue-500/40',
-    orange: 'bg-orange-500 shadow-orange-500/40',
-    green: 'bg-green-500 shadow-green-500/40',
-    purple: 'bg-fuchsia-500 shadow-fuchsia-500/40'
-  };
-
   return (
-    <motion.div 
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className={`bg-gradient-to-br ${colors[color]} p-8 rounded-[2.5rem] border shadow-2xl relative overflow-hidden group`}
-    >
-      <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 blur-3xl rounded-full -translate-y-16 translate-x-16 group-hover:bg-white/10 transition-all duration-700" />
-      
-      <div className="flex justify-between items-start mb-8">
-        <div className={`p-4 rounded-3xl text-white shadow-2xl ${iconColors[color]} transform group-hover:rotate-6 transition-transform duration-500`}>
-          {icon}
-        </div>
-        <div className="bg-stone-900/40 border border-white/5 rounded-full p-2">
-          <TrendingUp className="w-3 h-3 text-white/50" />
-        </div>
-      </div>
-      
-      <h3 className="text-[10px] font-black text-stone-500 uppercase tracking-[0.2em] mb-3">{title}</h3>
-      <p className="text-3xl font-black text-white mb-2 tracking-tighter">{value}</p>
-      <p className="text-[10px] text-stone-500 font-bold uppercase tracking-tight">{subtitle}</p>
+    <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+      className={`bg-gradient-to-br ${styles[color].card} to-stone-950 p-5 rounded-2xl border shadow-xl`}>
+      <div className={`w-9 h-9 ${styles[color].icon} rounded-xl flex items-center justify-center text-white shadow-lg mb-4`}>{icon}</div>
+      <p className="text-[10px] font-black text-stone-500 uppercase tracking-widest mb-1">{title}</p>
+      <p className="text-2xl font-black text-white tracking-tighter">{value}</p>
+      <p className="text-[10px] text-stone-500 font-bold mt-1">{sub}</p>
     </motion.div>
   );
 }
