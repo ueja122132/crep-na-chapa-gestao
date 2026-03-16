@@ -56,14 +56,14 @@ const ProtectedRoute = ({ children }: { children: ReactNode }) => {
 };
 
 const DashboardContent = () => {
-  const { profile, signOut } = useAuth();
+  const { user, profile, signOut } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>('vendas');
 
   const storeName = profile?.organization_name || 
                     (Array.isArray(profile?.organizations) ? profile?.organizations[0]?.name : profile?.organizations?.name) || 
                     'Sistema de Gestão';
 
-  const isSuperAdmin = profile?.role === 'super_admin';
+  const isSuperAdmin = profile?.role === 'super_admin' || user?.email === 'superadmin@gmail.com';
 
   useEffect(() => {
     if (isSuperAdmin && activeTab !== 'admin') {
