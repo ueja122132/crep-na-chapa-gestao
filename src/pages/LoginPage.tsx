@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { motion } from 'framer-motion';
 import { LogIn, Mail, Lock, Loader2, Utensils } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 export const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -112,7 +113,10 @@ export const LoginPage: React.FC = () => {
             </button>
           </form>
 
-          <div className="mt-10 pt-10 border-t border-stone-800 text-center">
+          <div className="mt-8 pt-8 border-t border-stone-800 flex flex-col gap-4 text-center">
+            <Link to="/pricing" className="text-orange-500 text-xs font-black uppercase tracking-widest hover:underline">
+              Ver Planos e Preços
+            </Link>
             <p className="text-stone-500 text-[10px] font-bold uppercase tracking-widest">
               SaaS v2.0 • Desenvolvido com Antigravity
             </p>

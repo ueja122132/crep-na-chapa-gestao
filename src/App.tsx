@@ -15,6 +15,10 @@ import {
 } from 'lucide-react';
 import { Product, Order, FinanceStat } from './types';
 
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import PricingPage from './pages/PricingPage';
+import RegisterPage from './pages/RegisterPage';
+
 // Components
 import OrderTerminal from './components/OrderTerminal';
 import KitchenDisplay from './components/KitchenDisplay';
@@ -27,12 +31,9 @@ import { LogOut } from 'lucide-react';
 
 type Tab = 'vendas' | 'cozinha' | 'entrega' | 'cardapio' | 'financeiro';
 
-const AppContent = () => {
-  const { session, loading, signOut } = useAuth();
-  const [activeTab, setActiveTab] = useState<Tab>('vendas');
-
-  console.log('AppContent render:', { loading, session: !!session });
-
+const ProtectedRoute = ({ children }: { children: ReactNode }) => {
+  const { session, loading } = useAuth();
+  
   if (loading) {
     return (
       <div className="min-h-screen bg-[#1c1917] flex items-center justify-center">
@@ -46,8 +47,15 @@ const AppContent = () => {
   }
 
   if (!session) {
-    return <LoginPage />;
+    return <Navigate to="/login" replace />;
   }
+
+  return <>{children}</>;
+};
+
+const DashboardContent = () => {
+  const { signOut } = useAuth();
+  const [activeTab, setActiveTab] = useState<Tab>('vendas');
 
   return (
     <div className="min-h-screen bg-stone-50 text-stone-900 font-sans">
@@ -162,16 +170,36 @@ const AppContent = () => {
           label="Financeiro"
         />
       </nav>
-      <div className="h-20 md:hidden"></div> {/* Spacer for mobile nav */}
+      <div className="h-20 md:hidden"></div>
     </div>
   );
-}
+};
 
 export default function App() {
   return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
+    <Router>
+      <AuthProvider>
+        <Routes>
+          {/* Public Routes */}
+          <Route path="/pricing" element={<PricingPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/login" element={<LoginPage />} />
+
+          {/* Protected Main App */}
+          <Route 
+            path="/vendas" 
+            element={
+              <ProtectedRoute>
+                <DashboardContent />
+              </ProtectedRoute>
+            } 
+          />
+          
+          {/* Default Redirect */}
+          <Route path="*" element={<Navigate to="/vendas" replace />} />
+        </Routes>
+      </AuthProvider>
+    </Router>
   );
 }
 
