@@ -24,6 +24,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Fail-safe: force loading false after timeout
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (loading) {
+        console.warn('AuthContext: Loading fail-safe triggered (timeout)');
+        setLoading(false);
+      }
+    }, 10000);
+    return () => clearTimeout(timer);
+  }, [loading]);
+
   const initialized = React.useRef(false);
 
   useEffect(() => {
@@ -69,7 +80,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
+  const fetchProfileInProgress = React.useRef<string | null>(null);
+
   const fetchProfile = async (userId: string) => {
+    if (fetchProfileInProgress.current === userId) return;
+    fetchProfileInProgress.current = userId;
+
+    console.log('AuthContext: Fetching profile for:', userId);
     try {
       const { data, error } = await supabase
         .from('user_profiles')
@@ -78,11 +95,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .single();
 
       if (error) {
-        console.error('Error fetching profile:', error);
+        if (error.code === 'PGRST116') {
+          console.log('AuthContext: No profile found for user (new user)');
+        } else {
+          console.error('AuthContext: Error fetching profile:', error);
+        }
       } else {
+        console.log('AuthContext: Profile loaded');
         setProfile(data);
       }
+    } catch (err: any) {
+      if (err.name !== 'AbortError') {
+        console.error('AuthContext: Exception in fetchProfile:', err);
+      }
     } finally {
+      fetchProfileInProgress.current = null;
+      console.log('AuthContext: Setting loading to false (fetchProfile)');
       setLoading(false);
     }
   };
