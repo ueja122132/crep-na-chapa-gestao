@@ -28,10 +28,11 @@ import FinancialDashboard from './components/FinancialDashboard';
 import DeliveryScreen from './components/DeliveryScreen';
 import { LoginPage } from './pages/LoginPage';
 import SuperAdminPage from './pages/SuperAdminPage';
+import SettingsManager from './components/SettingsManager';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { LogOut } from 'lucide-react';
+import { LogOut, Settings } from 'lucide-react';
 
-type Tab = 'vendas' | 'cozinha' | 'entrega' | 'cardapio' | 'financeiro' | 'admin';
+type Tab = 'vendas' | 'cozinha' | 'entrega' | 'cardapio' | 'financeiro' | 'config';
 
 const ProtectedRoute = ({ children }: { children: ReactNode }) => {
   const { session, loading } = useAuth();
@@ -64,8 +65,7 @@ const DashboardContent = () => {
                     'Sistema de Gestão';
 
   const isSuperAdmin = profile?.role === 'super_admin' || 
-                       user?.email?.toLowerCase() === 'superadmin@gmail.com' ||
-                       user?.email?.toLowerCase() === 'admin@crepnachapa.com';
+                       user?.email?.toLowerCase() === 'superadmin@gmail.com';
 
   useEffect(() => {
     console.log('App Debug - User Email:', user?.email);
@@ -88,8 +88,8 @@ const DashboardContent = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center gap-3">
-              <div className={`${isSuperAdmin ? 'bg-orange-600' : 'bg-orange-500'} p-2 rounded-lg`}>
-                <UtensilsCrossed className="text-white w-6 h-6" />
+              <div className={`${isSuperAdmin ? 'bg-indigo-600' : 'bg-orange-500'} p-2 rounded-lg transition-colors`}>
+                {isSuperAdmin ? <Shield className="text-white w-6 h-6" /> : <UtensilsCrossed className="text-white w-6 h-6" />}
               </div>
               <div>
                 <h1 className={`text-lg font-bold tracking-tight leading-none ${isSuperAdmin ? 'text-white' : 'text-stone-800'}`}>
@@ -134,6 +134,12 @@ const DashboardContent = () => {
                     icon={<BarChart3 className="w-4 h-4" />}
                     label="Financeiro"
                   />
+                  <TabButton 
+                    active={activeTab === 'config'} 
+                    onClick={() => setActiveTab('config')}
+                    icon={<Settings className="w-4 h-4" />}
+                    label="Ajustes"
+                  />
                 </nav>
               )}
 
@@ -171,6 +177,7 @@ const DashboardContent = () => {
                 {activeTab === 'entrega' && <DeliveryScreen />}
                 {activeTab === 'cardapio' && <MenuManager />}
                 {activeTab === 'financeiro' && <FinancialDashboard />}
+                {activeTab === 'config' && <SettingsManager />}
               </>
             )}
           </motion.div>
@@ -209,7 +216,13 @@ const DashboardContent = () => {
               active={activeTab === 'financeiro'} 
               onClick={() => setActiveTab('financeiro')}
               icon={<BarChart3 className="w-6 h-6" />}
-              label="Financeiro"
+              label="Gráficos"
+            />
+            <MobileTabButton 
+              active={activeTab === 'config'} 
+              onClick={() => setActiveTab('config')}
+              icon={<Settings className="w-6 h-6" />}
+              label="Ajustes"
             />
           </nav>
           <div className="h-20 md:hidden"></div>

@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Tag, DollarSign, ListChecks } from 'lucide-react';
+import { Plus, Trash2, Tag, DollarSign, ListChecks, Edit2, X } from 'lucide-react';
 import { Product, ProductType } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function MenuManager() {
   const [products, setProducts] = useState<Product[]>([]);
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [name, setName] = useState('');
   const [type, setType] = useState<ProductType>('crepe');
   const [price, setPrice] = useState('');
@@ -46,12 +47,32 @@ export default function MenuManager() {
     setIngredients(ingredients.filter((_, i) => i !== index));
   };
 
+  const startEdit = (product: Product) => {
+    setEditingId(product.id);
+    setName(product.name);
+    setType(product.type);
+    setPrice(product.price.toString());
+    setIngredients(product.ingredients);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setName('');
+    setType('crepe');
+    setPrice('');
+    setIngredients([]);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !price) return;
 
-    await fetch('/api/products', {
-      method: 'POST',
+    const url = editingId ? `/api/products/${editingId}` : '/api/products';
+    const method = editingId ? 'PATCH' : 'POST';
+
+    await fetch(url, {
+      method,
       headers: { 
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${session?.access_token}`
@@ -64,13 +85,12 @@ export default function MenuManager() {
       })
     });
 
-    setName('');
-    setPrice('');
-    setIngredients([]);
+    cancelEdit();
     fetchProducts();
   };
 
   const deleteProduct = async (id: number) => {
+    if (!window.confirm('Tem certeza que deseja excluir este item?')) return;
     await fetch(`/api/products/${id}`, { 
       method: 'DELETE',
       headers: { 'Authorization': `Bearer ${session?.access_token}` }
@@ -79,14 +99,24 @@ export default function MenuManager() {
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 pb-12">
       {/* Form */}
       <div className="lg:col-span-1">
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-stone-200">
-          <h2 className="text-lg font-semibold mb-6 flex items-center gap-2">
-            <Plus className="w-5 h-5 text-orange-500" />
-            Novo Item no Cardápio
-          </h2>
+        <div className={`bg-white p-6 rounded-2xl shadow-sm border transition-colors ${editingId ? 'border-orange-500 ring-2 ring-orange-100' : 'border-stone-200'}`}>
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-lg font-semibold flex items-center gap-2">
+              {editingId ? <Edit2 className="w-5 h-5 text-orange-500" /> : <Plus className="w-5 h-5 text-orange-500" />}
+              {editingId ? 'Editar Item' : 'Novo Item no Cardápio'}
+            </h2>
+            {editingId && (
+              <button 
+                onClick={cancelEdit}
+                className="p-1 px-2 text-xs font-bold text-stone-400 hover:text-stone-600 flex items-center gap-1"
+              >
+                <X className="w-3 h-3" /> Cancelar
+              </button>
+            )}
+          </div>
           
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
@@ -158,9 +188,9 @@ export default function MenuManager() {
 
             <button
               type="submit"
-              className="w-full py-3 bg-orange-500 text-white font-semibold rounded-xl hover:bg-orange-600 transition-colors shadow-lg shadow-orange-200 mt-4"
+              className={`w-full py-3 ${editingId ? 'bg-orange-600' : 'bg-orange-500'} text-white font-semibold rounded-xl hover:opacity-90 transition-all shadow-lg shadow-orange-200 mt-4 active:scale-95`}
             >
-              Salvar no Cardápio
+              {editingId ? 'Salvar Alterações' : 'Adicionar ao Cardápio'}
             </button>
           </form>
         </div>
@@ -176,7 +206,7 @@ export default function MenuManager() {
           
           <div className="divide-y divide-stone-100">
             {products.map((product) => (
-              <div key={product.id} className="p-6 hover:bg-stone-50 transition-colors group">
+              <div key={product.id} className={`p-6 hover:bg-stone-50 transition-colors group ${editingId === product.id ? 'bg-orange-50/50' : ''}`}>
                 <div className="flex justify-between items-start">
                   <div className="flex gap-4">
                     <div className={`p-3 rounded-xl ${product.type === 'crepe' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}`}>
@@ -200,12 +230,22 @@ export default function MenuManager() {
                       </div>
                     </div>
                   </div>
-                  <button
-                    onClick={() => deleteProduct(product.id)}
-                    className="p-2 text-stone-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
-                  >
-                    <Trash2 className="w-5 h-5" />
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => startEdit(product)}
+                      className="p-2 text-stone-300 hover:text-orange-500 transition-colors opacity-0 group-hover:opacity-100"
+                      title="Editar item"
+                    >
+                      <Edit2 className="w-5 h-5" />
+                    </button>
+                    <button
+                      onClick={() => deleteProduct(product.id)}
+                      className="p-2 text-stone-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+                      title="Excluir item"
+                    >
+                      <Trash2 className="w-5 h-5" />
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}

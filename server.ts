@@ -89,7 +89,7 @@ async function requireSuperAdmin(req: any, res: any, next: any) {
     }
 
     // Email direct fallback (Highest priority/reliability)
-    const rootEmails = ['superadmin@gmail.com', 'admin@crepnachapa.com'];
+    const rootEmails = ['superadmin@gmail.com'];
     if (user.email && rootEmails.includes(user.email.toLowerCase())) {
       console.log(`requireSuperAdmin: GRANTED root access to ${user.email}`);
       return next();
@@ -214,6 +214,36 @@ async function startServer() {
         return res.status(401).json({ error: error.message });
       }
       res.status(500).json({ error: "Internal server error deleting product" });
+    }
+  });
+
+  app.patch("/api/products/:id", async (req, res) => {
+    try {
+      const { name, type, price, ingredients } = req.body;
+      const orgId = await getOrganizationFromAuth(req.headers.authorization);
+      
+      const updates: any = {};
+      if (name) updates.name = name;
+      if (type) updates.type = type;
+      if (price !== undefined) updates.price = price;
+      if (ingredients) updates.ingredients = ingredients;
+
+      const { data, error } = await supabase
+        .from("products")
+        .update(updates)
+        .eq("id", req.params.id)
+        .eq('organization_id', orgId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      res.json(data);
+    } catch (error: any) {
+      console.error("Error updating product:", error);
+      if (error.message === 'Unauthorized' || error.message === 'Missing or invalid Authorization header') {
+        return res.status(401).json({ error: error.message });
+      }
+      res.status(500).json({ error: "Internal server error updating product" });
     }
   });
 
@@ -437,23 +467,46 @@ async function startServer() {
   // Super Admin Routes
   app.get("/api/admin/stats", requireSuperAdmin, async (req, res) => {
     try {
-      // Fetch all organizations
-      const { data: orgs } = await supabase.from('organizations').select('id, status');
+      // Fetch all organizations using select(*) to avoid errors if status column is missing
+      const { data: orgs, error: orgsError } = await supabase.from('organizations').select('*');
+      if (orgsError) throw orgsError;
       
       // Fetch all paid orders to calculate revenue
-      const { data: orders } = await supabase.from('orders').select('total_price').eq('payment_status', 'paid');
+      const { data: orders, error: ordersError } = await supabase.from('orders').select('total_price').eq('payment_status', 'paid');
+      if (ordersError) throw ordersError;
       
       const globalStats = {
         total_revenue: orders?.reduce((acc: number, curr: any) => acc + Number(curr.total_price), 0) || 0,
         total_orders: orders?.length || 0,
         active_stores: orgs?.filter((s: any) => s.status === 'active').length || 0,
-        total_stores: orgs?.length || 0
+        total_stores: orgs?.length || 0,
+        average_ticket: orders && orders.length > 0 ? (orders.reduce((acc: number, curr: any) => acc + Number(curr.total_price), 0) / orders.length) : 0
       };
 
       res.json(globalStats);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching admin stats:', error);
-      res.status(500).json({ error: 'Error fetching global stats' });
+      res.status(500).json({ error: `Error fetching global stats: ${error.message}` });
+    }
+  });
+
+  app.get("/api/admin/metrics", requireSuperAdmin, async (req, res) => {
+    try {
+      const { data: orgs } = await supabase.from('organizations').select('id, name');
+      const { data: orders } = await supabase.from('orders').select('organization_id, total_price').eq('payment_status', 'paid');
+
+      const ranking = orgs?.map(org => {
+        const orgOrders = orders?.filter(o => o.organization_id === org.id) || [];
+        return {
+          name: org.name,
+          total_sales: orgOrders.reduce((acc, curr) => acc + Number(curr.total_price), 0),
+          total_orders: orgOrders.length
+        };
+      }).sort((a, b) => b.total_sales - a.total_sales).slice(0, 5) || [];
+
+      res.json({ ranking });
+    } catch (error) {
+       res.status(500).json({ error: 'Error fetching metrics' });
     }
   });
 
@@ -506,8 +559,46 @@ async function startServer() {
 
       if (error) throw error;
       res.json({ success: true });
+    } catch (error: any) {
+      console.error('Error updating organization:', error);
+      res.status(500).json({ error: `Error updating organization: ${error.message}` });
+    }
+  });
+
+  app.get("/api/admin/organizations/:id/orders", requireSuperAdmin, async (req, res) => {
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('organization_id', req.params.id)
+        .order('created_at', { ascending: false })
+        .limit(50);
+      
+      if (error) throw error;
+      res.json(data);
     } catch (error) {
-      res.status(500).json({ error: 'Error updating organization' });
+      res.status(500).json({ error: 'Error fetching store orders' });
+    }
+  });
+
+  // Global Config
+  app.get("/api/admin/config", requireSuperAdmin, async (req, res) => {
+    try {
+      const { data } = await supabase.from('system_config').select('*');
+      res.json(data || []);
+    } catch (error) {
+      res.json([]);
+    }
+  });
+
+  app.post("/api/admin/config", requireSuperAdmin, async (req, res) => {
+    try {
+      const { key, value } = req.body;
+      const { error } = await supabase.from('system_config').upsert({ key, value });
+      if (error) throw error;
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: 'Error updating config' });
     }
   });
 

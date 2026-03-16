@@ -8,14 +8,15 @@ dotenv.config();
 // Postgres Host: aws-0-sa-east-1.pooler.supabase.com (obtido do console anteriormente)
 
 const clientConfig = {
-  host: 'aws-0-sa-east-1.pooler.supabase.com',
-  port: 5432,
+  host: 'db.djzccjezfnxmxvrhhzvb.supabase.co',
+  port: 6543,
   user: 'postgres.djzccjezfnxmxvrhhzvb',
   password: '2ZUVPZSsnxcqrdD9',
   database: 'postgres',
   ssl: {
     rejectUnauthorized: false
-  }
+  },
+  connectionTimeoutMillis: 10000
 };
 
 const sql = `
