@@ -17,32 +17,44 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Utility to resolve organization from Auth Header
 async function getOrganizationFromAuth(authHeader: string | undefined) {
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    throw new Error('Missing or invalid Authorization header');
+  try {
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      throw new Error('Missing or invalid Authorization header');
+    }
+
+    const token = authHeader.split(' ')[1];
+    
+    // 1. Get user from token
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    if (authError || !user) {
+      console.error('Auth error resolving user:', authError);
+      throw new Error('Unauthorized');
+    }
+
+    // 2. Get organization_id from user_profile
+    const { data: profile, error: profileError } = await supabase
+      .from('user_profiles')
+      .select('organization_id')
+      .eq('id', user.id)
+      .single();
+
+    if (profileError || !profile) {
+      console.warn(`Profile not found for user ${user.id} (${user.email}). Falling back to main org if admin.`);
+      
+      // Fallback for main admin if profile is missing
+      if (user.email === 'admin@crepnachapa.com' || user.email === 'seu-email-aqui') {
+         const { data: mainOrg } = await supabase.from('organizations').select('id').eq('slug', 'crep-na-chapa').single();
+         if (mainOrg) return mainOrg.id;
+      }
+      
+      throw new Error('Organization context not found. Please complete your registration.');
+    }
+
+    return profile.organization_id;
+  } catch (err: any) {
+    console.error('Critical error in getOrganizationFromAuth:', err.message);
+    throw err;
   }
-
-  const token = authHeader.split(' ')[1];
-  
-  // 1. Get user from token
-  const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-  if (authError || !user) {
-    console.error('Auth error resolving user:', authError);
-    throw new Error('Unauthorized');
-  }
-
-  // 2. Get organization_id from user_profile
-  const { data: profile, error: profileError } = await supabase
-    .from('user_profiles')
-    .select('organization_id')
-    .eq('id', user.id)
-    .single();
-
-  if (profileError || !profile) {
-    console.error('Error fetching profile for user:', user.id, profileError);
-    throw new Error('Organization context not found');
-  }
-
-  return profile.organization_id;
 }
 
 // SQLite initialization removed for Supabase migration
