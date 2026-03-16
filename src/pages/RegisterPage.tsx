@@ -36,6 +36,9 @@ export default function RegisterPage() {
     cardCvv: '',
   });
 
+  const hasOrganization = !!(profile?.organization_id || profile?.organizations?.name || profile?.organization_name);
+
+
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -43,30 +46,77 @@ export default function RegisterPage() {
 
     try {
       if (isUpgrade) {
-         // Garantir que não tentamos upgrade sem estar logado
          if (!session) {
-           throw new Error('Sessão expirada. Por favor, faça login novamente para mudar de plano.');
+           throw new Error('Sessão expirada. Por favor, faça login novamente.');
          }
 
-         const orgId = profile?.organization_id;
-         if (!orgId) {
-           throw new Error('Não foi possível localizar sua loja. Entre em contato com o suporte para mudar de plano.');
-         }
+         let orgId = profile?.organization_id;
 
-         // Lógica de Upgrade
-         const { error: upgradeError } = await supabase
-           .from('organizations')
-           .update({ 
-              plan: planId, 
-              payment_status: 'pending' // Volta para pendente no novo valor
-           })
-           .eq('id', orgId);
+         // Se não houver ID no perfil, tenta buscar pela tabela de organizações
+         if (!orgId && session.user.email) {
+           const { data: ownedOrg } = await supabase
+             .from('organizations')
+             .select('id')
+             .eq('owner_email', session.user.email)
+             .limit(1)
+             .single();
            
-         if (upgradeError) throw upgradeError;
-         
-         setSuccess(true);
-         setTimeout(() => navigate('/vendas'), 2500);
-         return;
+           if (ownedOrg) orgId = ownedOrg.id;
+         }
+
+         if (orgId) {
+           // Lógica de Upgrade - Atualização
+           const { error: upgradeError } = await supabase
+             .from('organizations')
+             .update({ 
+                plan: planId, 
+                payment_status: 'pending' 
+             })
+             .eq('id', orgId);
+             
+           if (upgradeError) throw upgradeError;
+           
+           setSuccess(true);
+           setTimeout(() => navigate('/vendas'), 2500);
+           return;
+         } else {
+           // Fluxo híbrido: Usuário logado mas sem loja (Primeira Ativação)
+           // Se o usuário não tem nome da loja no formData, pede pra preencher
+           if (!formData.storeName) {
+             throw new Error('Por favor, informe o nome da sua loja para ativar o plano.');
+           }
+
+           const slug = formData.storeName.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^\w-]/g, '');
+           const expiresAt = new Date();
+           expiresAt.setDate(expiresAt.getDate() + 30);
+
+           const { data: orgData, error: orgError } = await supabase
+             .from('organizations')
+             .insert([{
+               name: formData.storeName,
+               slug,
+               plan: planId,
+               status: 'active',
+               payment_status: 'pending',
+               subscription_expires_at: expiresAt.toISOString(),
+               owner_email: session.user.email,
+               owner_name: profile?.full_name || session.user.email,
+             }])
+             .select()
+             .single();
+
+           if (orgError) throw orgError;
+
+           // Linka o perfil atual à nova organização
+           await supabase
+             .from('user_profiles')
+             .update({ organization_id: orgData.id })
+             .eq('id', session.user.id);
+
+           setSuccess(true);
+           setTimeout(() => navigate('/vendas'), 2500);
+           return;
+         }
       }
 
       // Lógica de Registro Normal (Somente se NÃO for upgrade)
@@ -188,11 +238,9 @@ export default function RegisterPage() {
               </motion.div>
             )}
 
-            {!isUpgrade ? (
-              <>
-                <p className="text-xs font-black text-stone-500 uppercase tracking-widest border-b border-stone-800 pb-3">Dados do Responsável</p>
-
-                <div className="grid grid-cols-2 gap-4">
+            {(!hasOrganization || !isUpgrade) && (
+              <div className={!isUpgrade ? "grid grid-cols-2 gap-4" : ""}>
+                {!isUpgrade && (
                   <div>
                     <label className="block text-xs font-bold text-stone-400 mb-1.5 ml-1">Nome Completo</label>
                     <div className="relative">
@@ -202,17 +250,21 @@ export default function RegisterPage() {
                         value={formData.fullName} onChange={e => setFormData({ ...formData, fullName: e.target.value })} />
                     </div>
                   </div>
-                  <div>
-                    <label className="block text-xs font-bold text-stone-400 mb-1.5 ml-1">Nome da Loja</label>
-                    <div className="relative">
-                      <Store className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-500" />
-                      <input type="text" required placeholder="Creperia Gourmet"
-                        className="w-full bg-stone-800/50 border border-stone-700/50 rounded-xl py-3 pl-10 pr-3 text-white text-sm placeholder-stone-600 focus:outline-none focus:ring-2 focus:ring-orange-500/50"
-                        value={formData.storeName} onChange={e => setFormData({ ...formData, storeName: e.target.value })} />
-                    </div>
+                )}
+                <div>
+                  <label className="block text-xs font-bold text-stone-400 mb-1.5 ml-1">Nome da Loja</label>
+                  <div className="relative">
+                    <Store className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-500" />
+                    <input type="text" required placeholder="Creperia Gourmet"
+                      className="w-full bg-stone-800/50 border border-stone-700/50 rounded-xl py-3 pl-10 pr-3 text-white text-sm placeholder-stone-600 focus:outline-none focus:ring-2 focus:ring-orange-500/50"
+                      value={formData.storeName} onChange={e => setFormData({ ...formData, storeName: e.target.value })} />
                   </div>
                 </div>
+              </div>
+            )}
 
+            {!isUpgrade && (
+              <>
                 <div>
                   <label className="block text-xs font-bold text-stone-400 mb-1.5 ml-1">E-mail</label>
                   <div className="relative">
@@ -233,10 +285,12 @@ export default function RegisterPage() {
                   </div>
                 </div>
               </>
-            ) : (
+            )}
+
+            {isUpgrade && hasOrganization && (
               <div className="p-4 bg-orange-500/10 border border-orange-500/30 rounded-2xl flex items-center gap-3 text-orange-400 text-sm">
                 <Store className="w-5 h-5 flex-shrink-0" />
-                <span>O plano atual da loja <strong>{profile?.organizations?.name || profile?.organization_name || 'Autenticada'}</strong> será substituído.</span>
+                <span>O plano atual da loja <strong>{profile?.organizations?.name || profile?.organization_name || 'Principal'}</strong> será substituído.</span>
               </div>
             )}
 
