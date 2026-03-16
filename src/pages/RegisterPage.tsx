@@ -65,7 +65,8 @@ export default function RegisterPage() {
           .single();
         
         if (org?.name) {
-          setFormData(prev => ({ ...prev, storeName: org.name }));
+          const finalName = (org.name === 'Loja' || org.name === 'Crep na Chapa') ? 'tem de tudo' : org.name;
+          setFormData(prev => ({ ...prev, storeName: finalName }));
         }
       }
     }
@@ -101,28 +102,33 @@ export default function RegisterPage() {
          }
 
          if (orgId) {
-            console.log('Atualizando plano da loja:', orgId, 'para:', planId);
-            // Lógica de Upgrade - Atualização
-            const { error: upgradeError } = await supabase
-              .from('organizations')
-              .update({ 
-                 plan: planId, 
-                 payment_status: 'pending',
-                 // Preservamos a expiração atual ou resetamos? 
-                 // Resetamos para garantir que o novo pagamento cubra o novo período.
-                 subscription_expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
-              })
-              .eq('id', orgId);
-              
-            if (upgradeError) {
-              console.error('Erro no update da organização:', upgradeError);
-              throw upgradeError;
-            }
-            
-            setSuccess(true);
-            setTimeout(() => navigate('/vendas'), 2500);
-            return;
-         } else {
+             console.log('Finalizando upgrade da loja:', orgId, 'para:', planId);
+             
+             // Timeout de segurança para não travar o spinner se o Supabase demorar
+             const updatePromise = supabase
+               .from('organizations')
+               .update({ 
+                  plan: planId, 
+                  payment_status: 'pending',
+                  subscription_expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+               })
+               .eq('id', orgId);
+
+             const timeoutPromise = new Promise((_, reject) => 
+               setTimeout(() => reject(new Error('A operação demorou muito. Verifique sua conexão ou tente novamente.')), 10000)
+             );
+
+             const { error: upgradeError } = await Promise.race([updatePromise, timeoutPromise]) as any;
+               
+             if (upgradeError) {
+               console.error('Erro fatal no update da organização:', upgradeError);
+               throw new Error('Não foi possível atualizar o plano: ' + (upgradeError.message || 'Erro de conexão/permissão'));
+             }
+             
+             setSuccess(true);
+             setTimeout(() => navigate('/vendas'), 2500);
+             return;
+          } else {
             console.log('Nenhuma organização encontrada. Criando nova loja para o usuário logado.');
             // Fluxo híbrido: Usuário logado mas sem loja (Primeira Ativação)
            // Se o usuário não tem nome da loja no formData, pede pra preencher

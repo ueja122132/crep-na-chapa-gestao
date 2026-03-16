@@ -108,8 +108,10 @@ export default function SubscriptionWidget() {
     payment_status: 'pending',
     subscription_expires_at: null,
     status: 'inactive',
-    name: 'Loja Não Vinculada'
+    name: 'tem de tudo' // Nunca usar "Loja" como fallback
   };
+
+  const displayName = (safeData.name === 'Loja' || safeData.name === 'Crep na Chapa' || safeData.name === 'Loja Não Vinculada') ? 'tem de tudo' : safeData.name;
 
   const plan = PLAN_DISPLAY[safeData.plan] || { label: safeData.plan || 'Básico', icon: <Zap className="w-4 h-4" />, color: 'text-stone-400 bg-stone-500/10 border-stone-500/20', price: 0 };
 
@@ -143,7 +145,7 @@ export default function SubscriptionWidget() {
             <h3 className="text-xs font-black text-stone-400 uppercase tracking-widest">Minha Assinatura</h3>
             {isUpgradeAdmin && data && (
               <Link 
-                to={`/pricing?upgrade=true&storeName=${encodeURIComponent(safeData.name)}&orgId=${safeData.id || ''}&v=${Date.now()}`}
+                to={`/pricing?upgrade=true&storeName=${encodeURIComponent(displayName)}&orgId=${safeData.id || ''}&v=${Date.now()}`}
                 className="px-2.5 py-1 bg-[#ea580c] hover:bg-[#c2410c] text-white rounded text-[10px] font-black uppercase tracking-wider transition-colors flex items-center gap-1"
                 title="Mudar de Plano (Upgrade/Downgrade)"
               >
