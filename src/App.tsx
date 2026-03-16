@@ -54,8 +54,10 @@ const ProtectedRoute = ({ children }: { children: ReactNode }) => {
 };
 
 const DashboardContent = () => {
-  const { signOut } = useAuth();
+  const { profile, signOut } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>('vendas');
+
+  const storeName = profile?.organizations?.name || 'Crep na Chapa';
 
   return (
     <div className="min-h-screen bg-stone-50 text-stone-900 font-sans">
@@ -63,13 +65,18 @@ const DashboardContent = () => {
       <header className="bg-white border-b border-stone-200 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               <div className="bg-orange-500 p-2 rounded-lg">
                 <UtensilsCrossed className="text-white w-6 h-6" />
               </div>
-              <h1 className="text-xl font-bold tracking-tight text-stone-800">
-                Crep na Chapa
-              </h1>
+              <div>
+                <h1 className="text-lg font-bold tracking-tight text-stone-800 leading-none">
+                  {storeName}
+                </h1>
+                <p className="text-[10px] text-stone-500 font-medium uppercase tracking-wider mt-0.5">
+                  Olá, administrador
+                </p>
+              </div>
             </div>
             
             <div className="flex items-center gap-4">
