@@ -424,31 +424,57 @@ async function startServer() {
   // Super Admin Routes
   app.get("/api/admin/stats", requireSuperAdmin, async (req, res) => {
     try {
-      const { data: stats } = await supabase.from('admin_organization_stats').select('*');
+      // Fetch all organizations
+      const { data: orgs } = await supabase.from('organizations').select('id, status');
+      
+      // Fetch all paid orders to calculate revenue
+      const { data: orders } = await supabase.from('orders').select('total_price').eq('payment_status', 'paid');
       
       const globalStats = {
-        total_revenue: stats?.reduce((acc: number, curr: any) => acc + Number(curr.total_sales), 0) || 0,
-        total_orders: stats?.reduce((acc: number, curr: any) => acc + Number(curr.total_orders), 0) || 0,
-        active_stores: stats?.filter((s: any) => s.status === 'active').length || 0,
-        total_stores: stats?.length || 0
+        total_revenue: orders?.reduce((acc: number, curr: any) => acc + Number(curr.total_price), 0) || 0,
+        total_orders: orders?.length || 0,
+        active_stores: orgs?.filter((s: any) => s.status === 'active').length || 0,
+        total_stores: orgs?.length || 0
       };
 
       res.json(globalStats);
     } catch (error) {
+      console.error('Error fetching admin stats:', error);
       res.status(500).json({ error: 'Error fetching global stats' });
     }
   });
 
   app.get("/api/admin/organizations", requireSuperAdmin, async (req, res) => {
     try {
-      const { data, error } = await supabase
-        .from('admin_organization_stats')
+      // 1. Get all organizations
+      const { data: orgs, error: orgsError } = await supabase
+        .from('organizations')
         .select('*')
         .order('created_at', { ascending: false });
       
-      if (error) throw error;
-      res.json(data);
+      if (orgsError) throw orgsError;
+
+      // 2. Get order summary for all organizations
+      const { data: orderStats, error: statsError } = await supabase
+        .from('orders')
+        .select('organization_id, total_price')
+        .eq('payment_status', 'paid');
+
+      if (statsError) throw statsError;
+
+      // 3. Map orders to organizations
+      const mappedOrgs = orgs.map(org => {
+        const orgOrders = orderStats.filter(o => o.organization_id === org.id);
+        return {
+          ...org,
+          total_orders: orgOrders.length,
+          total_sales: orgOrders.reduce((acc, curr) => acc + (curr.total_price || 0), 0)
+        };
+      });
+
+      res.json(mappedOrgs);
     } catch (error) {
+      console.error('Error fetching admin organizations:', error);
       res.status(500).json({ error: 'Error fetching organizations' });
     }
   });
