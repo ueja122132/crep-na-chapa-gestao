@@ -8,7 +8,7 @@ interface UserProfile {
   full_name: string | null;
   organizations?: {
     name: string;
-  };
+  } | { name: string }[];
 }
 
 interface AuthContextType {
@@ -86,7 +86,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           console.error('AuthContext: Error fetching profile:', error);
         }
       } else {
-        console.log('AuthContext: Profile loaded');
+        console.log('AuthContext: Profile loaded', data);
+        // Garantir que organizations.name seja acessível mesmo se retornar como array
+        if (data && data.organizations && Array.isArray(data.organizations)) {
+          data.organization_name = data.organizations[0]?.name;
+        } else if (data && data.organizations) {
+          data.organization_name = data.organizations.name;
+        }
         setProfile(data);
       }
     } catch (err: any) {

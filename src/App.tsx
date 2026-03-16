@@ -57,7 +57,9 @@ const DashboardContent = () => {
   const { profile, signOut } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>('vendas');
 
-  const storeName = profile?.organizations?.name || 'Crep na Chapa';
+  const storeName = profile?.organization_name || 
+                    (Array.isArray(profile?.organizations) ? profile?.organizations[0]?.name : profile?.organizations?.name) || 
+                    'Sistema de Gestão';
 
   return (
     <div className="min-h-screen bg-stone-50 text-stone-900 font-sans">
