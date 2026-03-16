@@ -94,6 +94,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } else if (data && data.organizations) {
           data.organization_name = data.organizations.name;
         }
+
+        // Blindagem contra nomes incorretos ou obsoletos
+        if (data.organization_id === '9b1462c0-d902-4fdc-9542-7a92f6c28402' || data.organization_id === 'ba2087fe-0498-43f4-93dc-bdf9f2f1ce66') {
+           data.organization_name = 'tem de tudo';
+        }
+
         setProfile(data);
       }
     } catch (err: any) {

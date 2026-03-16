@@ -626,6 +626,7 @@ async function startServer() {
 
   // Subscription info for logged-in store
   app.get("/api/subscription", async (req, res) => {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     try {
       const orgId = await getOrganizationFromAuth(req.headers.authorization);
       const { data, error } = await supabase
