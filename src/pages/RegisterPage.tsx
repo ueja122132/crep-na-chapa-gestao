@@ -42,9 +42,18 @@ export default function RegisterPage() {
     setError(null);
 
     try {
-      if (isUpgrade && session && profile?.organization_id) {
+      if (isUpgrade) {
+         // Garantir que não tentamos upgrade sem estar logado
+         if (!session) {
+           throw new Error('Sessão expirada. Por favor, faça login novamente para mudar de plano.');
+         }
+
+         const orgId = profile?.organization_id;
+         if (!orgId) {
+           throw new Error('Não foi possível localizar sua loja. Entre em contato com o suporte para mudar de plano.');
+         }
+
          // Lógica de Upgrade
-         const orgId = profile.organization_id;
          const { error: upgradeError } = await supabase
            .from('organizations')
            .update({ 
@@ -60,7 +69,7 @@ export default function RegisterPage() {
          return;
       }
 
-      // Lógica de Registro Normal
+      // Lógica de Registro Normal (Somente se NÃO for upgrade)
       // 1. Create Auth User
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: formData.email,
