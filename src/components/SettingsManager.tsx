@@ -37,7 +37,7 @@ export default function SettingsManager() {
     setMessage(null);
 
     try {
-      const res = await fetch('/api/admin/config', { // Reuse system_config endpoint or specialized settings
+      const res = await fetch('/api/settings', { // Usando o endpoint correto local da loja
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

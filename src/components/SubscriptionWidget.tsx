@@ -66,7 +66,12 @@ export default function SubscriptionWidget() {
       });
       
       // Atualizar o frontend imediatamente para experiência fluida
-      setData(prev => prev ? { ...prev, payment_status: 'paid', subscription_expires_at: nextExpiry.toISOString(), status: 'active' } : null);
+      setData(prev => ({ 
+        ...(prev || { plan: 'essencial', name: 'Loja', created_at: new Date().toISOString() }), 
+        payment_status: 'paid', 
+        subscription_expires_at: nextExpiry.toISOString(), 
+        status: 'active' 
+      }));
       setShowPixPay(false);
     } catch (e) {
       console.error(e);
@@ -76,11 +81,19 @@ export default function SubscriptionWidget() {
   };
 
   if (loading) return null;
-  if (!data) return null;
+  // REMOVIDO: if (!data) return null;
+  // Se não houver dados (erro na api ou usuario sem organizacao), assumimos um valor padrão para não esconder o painel construído
+  const safeData = data || {
+    plan: 'essencial',
+    payment_status: 'pending',
+    subscription_expires_at: null,
+    status: 'inactive',
+    name: 'Loja Não Vinculada'
+  };
 
-  const plan = PLAN_DISPLAY[data.plan] || { label: data.plan || 'Básico', icon: <Zap className="w-4 h-4" />, color: 'text-stone-400 bg-stone-500/10 border-stone-500/20', price: 0 };
+  const plan = PLAN_DISPLAY[safeData.plan] || { label: safeData.plan || 'Básico', icon: <Zap className="w-4 h-4" />, color: 'text-stone-400 bg-stone-500/10 border-stone-500/20', price: 0 };
 
-  const expiresAt = data.subscription_expires_at ? new Date(data.subscription_expires_at) : null;
+  const expiresAt = safeData.subscription_expires_at ? new Date(safeData.subscription_expires_at) : null;
   const now = new Date();
   const daysLeft = expiresAt ? Math.ceil((expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : null;
   const isExpiringSoon = daysLeft !== null && daysLeft <= 5;
@@ -91,7 +104,7 @@ export default function SubscriptionWidget() {
     pending: { label: 'Pendente', color: 'text-yellow-400', icon: <Clock className="w-4 h-4" /> },
     overdue: { label: 'Em Atraso', color: 'text-red-400', icon: <AlertTriangle className="w-4 h-4" /> },
   };
-  const paymentInfo = paymentStatusDisplay[data.payment_status] || paymentStatusDisplay.pending;
+  const paymentInfo = paymentStatusDisplay[safeData.payment_status] || paymentStatusDisplay.pending;
 
   return (
     <div className="space-y-4">
@@ -99,6 +112,7 @@ export default function SubscriptionWidget() {
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         className={`rounded-2xl border p-5 ${
+          !data ? 'bg-stone-900/50 border-stone-800 opacity-60' :
           isExpired ? 'bg-red-500/10 border-red-500/30' :
           isExpiringSoon ? 'bg-yellow-500/10 border-yellow-500/30' :
           'bg-stone-900/50 border-stone-800'
@@ -106,7 +120,7 @@ export default function SubscriptionWidget() {
       >
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-xs font-black text-stone-400 uppercase tracking-widest">Minha Assinatura</h3>
-          {data.payment_status !== 'paid' && (
+          {(!data || safeData.payment_status !== 'paid') && (
              <button 
                 onClick={() => setShowPixPay(!showPixPay)}
                 className="bg-orange-500 text-stone-900 px-4 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider hover:bg-orange-400 transition-colors shadow-lg shadow-orange-500/20 flex items-center gap-2">
