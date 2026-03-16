@@ -16,9 +16,11 @@ export const LoginPage: React.FC = () => {
   // Redirecionar se já estiver logado
   React.useEffect(() => {
     if (session) {
-      navigate('/vendas', { replace: true });
+      console.log('LoginPage: Session detected, redirecting to dashboard...');
+      // Usar window.location.href garante que o app recarregue com o novo estado de auth limpo
+      window.location.href = '/vendas';
     }
-  }, [session, navigate]);
+  }, [session]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,8 +35,9 @@ export const LoginPage: React.FC = () => {
 
       if (error) throw error;
       
+      console.log('LoginPage: Login successful, forcing redirect...');
       // Forçar navegação após sucesso
-      navigate('/vendas', { replace: true });
+      window.location.href = '/vendas';
     } catch (err: any) {
       setError(err.message || 'Erro ao realizar login');
     } finally {
