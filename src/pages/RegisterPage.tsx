@@ -269,15 +269,17 @@ export default function RegisterPage() {
 
             <button type="submit" disabled={loading}
               className="w-full bg-gradient-to-r from-orange-500 to-amber-500 text-stone-900 font-bold py-4 rounded-2xl shadow-lg shadow-orange-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:hover:scale-100">
-              {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <><ArrowRight className="w-5 h-5" />Criar minha loja agora</>}
+              {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <><ArrowRight className="w-5 h-5" />{isUpgrade ? 'Confirmar Novo Plano e Pagar' : 'Criar minha loja agora'}</>}
             </button>
           </form>
 
-          <div className="mt-6 pt-6 border-t border-stone-800 text-center">
-            <p className="text-stone-500 text-sm">
-              Já possui uma loja? <Link to="/login" className="text-orange-500 font-bold hover:underline">Fazer Login</Link>
-            </p>
-          </div>
+          {!isUpgrade && (
+            <div className="mt-6 pt-6 border-t border-stone-800 text-center">
+              <p className="text-stone-500 text-sm">
+                Já possui uma loja? <Link to="/login" className="text-orange-500 font-bold hover:underline">Fazer Login</Link>
+              </p>
+            </div>
+          )}
         </div>
 
         <div className="mt-6 text-center">
