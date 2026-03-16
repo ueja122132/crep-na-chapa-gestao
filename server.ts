@@ -15,6 +15,15 @@ const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL ||
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || "";
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+// Utility to get current organization (mocking for now until auth is added)
+let currentOrgId: string | null = null;
+async function ensureOrgId() {
+  if (currentOrgId) return currentOrgId;
+  const { data, error } = await supabase.from('organizations').select('id').eq('slug', 'crep-na-chapa').single();
+  if (data) currentOrgId = data.id;
+  return currentOrgId;
+}
+
 // SQLite initialization removed for Supabase migration
 
 async function startServer() {
@@ -26,9 +35,11 @@ async function startServer() {
   // Settings
   app.get('/api/settings', async (req, res) => {
     try {
+      const orgId = await ensureOrgId();
       const { data, error } = await supabase
         .from('settings')
-        .select('*');
+        .select('*')
+        .eq('organization_id', orgId);
       
       const defaultSettings = [
         { key: 'extra_ingredient_price', value: '5.00' }
@@ -47,7 +58,11 @@ async function startServer() {
   // Products (Menu)
   app.get("/api/products", async (req, res) => {
     try {
-      const { data, error } = await supabase.from("products").select("*");
+      const orgId = await ensureOrgId();
+      const { data, error } = await supabase
+        .from("products")
+        .select("*")
+        .eq('organization_id', orgId);
       if (error) throw error;
       res.json(data.map(p => ({ 
         ...p, 
@@ -67,11 +82,13 @@ async function startServer() {
         return res.status(400).json({ error: "Missing required fields: name, type, price" });
       }
 
+      const orgId = await ensureOrgId();
       const { data, error } = await supabase.from("products").insert({
         name,
         type,
         price,
-        ingredients: ingredients || []
+        ingredients: ingredients || [],
+        organization_id: orgId
       }).select().single();
 
       if (error) throw error;
@@ -96,9 +113,11 @@ async function startServer() {
   // Orders
   app.get("/api/orders", async (req, res) => {
     try {
+      const orgId = await ensureOrgId();
       const { data: orders, error: ordersError } = await supabase
         .from("orders")
         .select("*, order_items(*)")
+        .eq('organization_id', orgId)
         .order("created_at", { ascending: true });
       
       if (ordersError) throw ordersError;
@@ -125,6 +144,7 @@ async function startServer() {
       }
 
       // Step 1: Create Order
+      const orgId = await ensureOrgId();
       const { data: order, error: orderError } = await supabase
         .from("orders")
         .insert({
@@ -132,7 +152,8 @@ async function startServer() {
           total_price,
           payment_status: payment_status || 'pending',
           payment_method: payment_method || null,
-          amount_received: amount_received || null
+          amount_received: amount_received || null,
+          organization_id: orgId
         })
         .select()
         .single();
@@ -146,7 +167,8 @@ async function startServer() {
         product_name: item.product_name,
         product_type: item.product_type,
         price: item.price,
-        customizations: item.customizations || []
+        customizations: item.customizations || [],
+        organization_id: orgId
       }));
 
       const { error: itemsError } = await supabase.from("order_items").insert(orderItems);
@@ -226,10 +248,12 @@ async function startServer() {
   // Finance
   app.get("/api/finance/stats", async (req, res) => {
     try {
+      const orgId = await ensureOrgId();
       // Fallback if RPC not defined or for more detailed data
       const { data: fallbackData, error: fallbackError } = await supabase
         .from("orders")
         .select("total_price, created_at, payment_method, order_items(product_type, product_name)")
+        .eq('organization_id', orgId)
         .eq("payment_status", "paid");
       
       if (fallbackError) throw fallbackError;

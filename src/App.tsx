@@ -21,11 +21,31 @@ import KitchenDisplay from './components/KitchenDisplay';
 import MenuManager from './components/MenuManager';
 import FinancialDashboard from './components/FinancialDashboard';
 import DeliveryScreen from './components/DeliveryScreen';
+import { LoginPage } from './pages/LoginPage';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { LogOut } from 'lucide-react';
 
 type Tab = 'vendas' | 'cozinha' | 'entrega' | 'cardapio' | 'financeiro';
 
-export default function App() {
+const AppContent = () => {
+  const { session, loading, signOut } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>('vendas');
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#1c1917] flex items-center justify-center">
+        <motion.div 
+          animate={{ rotate: 360 }}
+          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+          className="w-8 h-8 border-2 border-amber-500 border-t-transparent rounded-full"
+        />
+      </div>
+    );
+  }
+
+  if (!session) {
+    return <LoginPage />;
+  }
 
   return (
     <div className="min-h-screen bg-stone-50 text-stone-900 font-sans">
@@ -42,38 +62,48 @@ export default function App() {
               </h1>
             </div>
             
-            <nav className="hidden md:flex space-x-1">
-              <TabButton 
-                active={activeTab === 'vendas'} 
-                onClick={() => setActiveTab('vendas')}
-                icon={<ShoppingBag className="w-4 h-4" />}
-                label="Vendas"
-              />
-              <TabButton 
-                active={activeTab === 'cozinha'} 
-                onClick={() => setActiveTab('cozinha')}
-                icon={<ChefHat className="w-4 h-4" />}
-                label="Cozinha"
-              />
-              <TabButton 
-                active={activeTab === 'entrega'} 
-                onClick={() => setActiveTab('entrega')}
-                icon={<Package className="w-4 h-4" />}
-                label="Entrega"
-              />
-              <TabButton 
-                active={activeTab === 'cardapio'} 
-                onClick={() => setActiveTab('cardapio')}
-                icon={<ClipboardList className="w-4 h-4" />}
-                label="Cardápio"
-              />
-              <TabButton 
-                active={activeTab === 'financeiro'} 
-                onClick={() => setActiveTab('financeiro')}
-                icon={<BarChart3 className="w-4 h-4" />}
-                label="Financeiro"
-              />
-            </nav>
+            <div className="flex items-center gap-4">
+              <nav className="hidden md:flex space-x-1">
+                <TabButton 
+                  active={activeTab === 'vendas'} 
+                  onClick={() => setActiveTab('vendas')}
+                  icon={<ShoppingBag className="w-4 h-4" />}
+                  label="Vendas"
+                />
+                <TabButton 
+                  active={activeTab === 'cozinha'} 
+                  onClick={() => setActiveTab('cozinha')}
+                  icon={<ChefHat className="w-4 h-4" />}
+                  label="Cozinha"
+                />
+                <TabButton 
+                  active={activeTab === 'entrega'} 
+                  onClick={() => setActiveTab('entrega')}
+                  icon={<Package className="w-4 h-4" />}
+                  label="Entrega"
+                />
+                <TabButton 
+                  active={activeTab === 'cardapio'} 
+                  onClick={() => setActiveTab('cardapio')}
+                  icon={<ClipboardList className="w-4 h-4" />}
+                  label="Cardápio"
+                />
+                <TabButton 
+                  active={activeTab === 'financeiro'} 
+                  onClick={() => setActiveTab('financeiro')}
+                  icon={<BarChart3 className="w-4 h-4" />}
+                  label="Financeiro"
+                />
+              </nav>
+
+              <button 
+                onClick={signOut}
+                className="p-2 text-stone-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                title="Sair do Sistema"
+              >
+                <LogOut className="w-5 h-5" />
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -132,6 +162,14 @@ export default function App() {
       </nav>
       <div className="h-20 md:hidden"></div> {/* Spacer for mobile nav */}
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }
 
