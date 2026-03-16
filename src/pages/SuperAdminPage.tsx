@@ -148,21 +148,21 @@ export default function SuperAdminPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatsCard 
           title="Receita bruta" 
-          value={`R$ ${stats?.total_revenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+          value={`R$ ${(stats?.total_revenue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
           subtitle="Volume total processado"
           icon={<CreditCard className="w-6 h-6" />}
           color="blue"
         />
         <StatsCard 
           title="Pedidos Totais" 
-          value={stats?.total_orders.toLocaleString() || '0'}
+          value={(stats?.total_orders || 0).toLocaleString() || '0'}
           subtitle="Transações em toda rede"
           icon={<ShoppingBag className="w-6 h-6" />}
           color="orange"
         />
         <StatsCard 
           title="Lojas Ativas" 
-          value={`${stats?.active_stores} / ${stats?.total_stores}`}
+          value={`${stats?.active_stores || 0} / ${stats?.total_stores || 0}`}
           subtitle={`${stats?.total_stores ? Math.round((stats.active_stores / stats.total_stores) * 100) : 0}% de engajamento`}
           icon={<Building2 className="w-6 h-6" />}
           color="green"
