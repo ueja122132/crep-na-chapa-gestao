@@ -630,7 +630,7 @@ async function startServer() {
       const orgId = await getOrganizationFromAuth(req.headers.authorization);
       const { data, error } = await supabase
         .from('organizations')
-        .select('name, plan, status, payment_status, subscription_expires_at, created_at')
+        .select('id, name, plan, status, payment_status, subscription_expires_at, created_at')
         .eq('id', orgId)
         .single();
       if (error) throw error;

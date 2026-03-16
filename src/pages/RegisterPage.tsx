@@ -83,17 +83,17 @@ export default function RegisterPage() {
            throw new Error('Sessão expirada. Por favor, faça login novamente.');
          }
 
-         // Prioridade: ID vindo da URL (mais rápido) > ID do Perfil > Busca por OwnerID
+         // Prioridade: ID vindo da URL (mais rápido) > ID do Perfil > Busca por Email
          let orgId = urlOrgId || profile?.organization_id;
 
          console.log('Iniciando upgrade para organização:', orgId, { urlOrgId, profileOrgId: profile?.organization_id });
 
-         // Se ainda não houver ID, tenta buscar por owner_id (UUID do usuário)
-         if (!orgId && session.user.id) {
+         // Se ainda não houver ID, tenta buscar por owner_email
+         if (!orgId && session.user.email) {
            const { data: ownedOrg } = await supabase
              .from('organizations')
              .select('id')
-             .eq('owner_id', session.user.id)
+             .eq('owner_email', session.user.email)
              .limit(1)
              .maybeSingle();
            
@@ -140,7 +140,7 @@ export default function RegisterPage() {
                status: 'active',
                payment_status: 'pending',
                subscription_expires_at: expiresAt.toISOString(),
-               owner_id: session.user.id,
+               owner_email: session.user.email,
                owner_name: profile?.full_name || session.user.email,
              }])
              .select()

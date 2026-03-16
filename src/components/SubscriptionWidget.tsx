@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { motion } from 'framer-motion';
 
 interface SubscriptionData {
+  id: string;
   name: string;
   plan: string;
   status: string;
@@ -85,6 +86,7 @@ export default function SubscriptionWidget() {
   // REMOVIDO: if (!data) return null;
   // Se não houver dados (erro na api ou usuario sem organizacao), assumimos um valor padrão para não esconder o painel construído
   const safeData = data || {
+    id: '',
     plan: 'essencial',
     payment_status: 'pending',
     subscription_expires_at: null,
