@@ -126,7 +126,7 @@ export default function SubscriptionWidget() {
             <h3 className="text-xs font-black text-stone-400 uppercase tracking-widest">Minha Assinatura</h3>
             {safeData.payment_status === 'paid' && data && (
               <Link 
-                to={`/pricing?upgrade=true&storeName=${encodeURIComponent(safeData.name)}&orgId=${safeData.id || ''}`}
+                to={`/pricing?upgrade=true&storeName=${encodeURIComponent(safeData.name)}&orgId=${safeData.id || ''}&v=${Date.now()}`}
                 className="px-2.5 py-1 bg-[#ea580c] hover:bg-[#c2410c] text-white rounded text-[10px] font-black uppercase tracking-wider transition-colors flex items-center gap-1"
                 title="Mudar de Plano (Upgrade/Downgrade)"
               >

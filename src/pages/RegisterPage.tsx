@@ -42,8 +42,8 @@ export default function RegisterPage() {
 
   useEffect(() => {
     async function loadOrgName() {
-      // Se já veio da URL, não precisamos buscar
-      if (urlStoreName) {
+      // Se já veio da URL e não é o nome genérico "Loja", não precisamos buscar
+      if (urlStoreName && urlStoreName !== 'Loja') {
         setFormData(prev => ({ ...prev, storeName: urlStoreName }));
         return;
       }

@@ -46,9 +46,9 @@ async function getOrganizationFromAuth(authHeader: string | undefined) {
       const isAdmin = adminEmails.includes(user.email || '') || (user.email && user.email.endsWith('@crepnachapa.com'));
 
       if (isAdmin) {
-         const { data: mainOrg } = await supabase.from('organizations').select('id').eq('slug', 'crep-na-chapa').single();
+         const { data: mainOrg } = await supabase.from('organizations').select('id').eq('slug', 'tem-de-tudo').single();
          if (mainOrg) {
-           console.log(`Fallback successful: Mapping admin ${user.email} to main organization.`);
+           console.log(`Fallback successful: Mapping admin ${user.email} to tem-de-tudo organization.`);
            return mainOrg.id;
          }
       }
