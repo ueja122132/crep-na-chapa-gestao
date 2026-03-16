@@ -116,6 +116,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setProfile(null);
       setLoading(false);
       
+      // Limpeza física do localStorage para evitar restauração automática pelo Supabase Auth
+      // O Supabase usa chaves como 'sb-djzccjezfnxmxvrhhzvb-auth-token'
+      Object.keys(localStorage).forEach(key => {
+        if (key.includes('sb-') && key.includes('-auth-token')) {
+          localStorage.removeItem(key);
+        }
+      });
+      
       await supabase.auth.signOut();
       
       // Forçar redirecionamento e recarregamento para limpar cache do navegador
