@@ -22,13 +22,14 @@ export default function RegisterPage() {
   const planName = searchParams.get('name') || 'Essencial';
   const planPrice = searchParams.get('price') || '50';
   const isUpgrade = searchParams.get('upgrade') === 'true';
+  const urlStoreName = searchParams.get('storeName');
   const planData = PLAN_INFO[planId] || PLAN_INFO.essencial;
 
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
     password: '',
-    storeName: '',
+    storeName: urlStoreName || '',
     // Simulação de pagamento
     cardNumber: '',
     cardName: '',
@@ -40,6 +41,12 @@ export default function RegisterPage() {
 
   useEffect(() => {
     async function loadOrgName() {
+      // Se já veio da URL, não precisamos buscar
+      if (urlStoreName) {
+        setFormData(prev => ({ ...prev, storeName: urlStoreName }));
+        return;
+      }
+
       if (isUpgrade && session?.user?.email) {
         // 1. Tenta pegar do perfil
         const profileName = profile?.organization_name || (profile?.organizations as any)?.name;
@@ -62,7 +69,7 @@ export default function RegisterPage() {
       }
     }
     loadOrgName();
-  }, [isUpgrade, profile, session]);
+  }, [isUpgrade, profile, session, urlStoreName]);
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();

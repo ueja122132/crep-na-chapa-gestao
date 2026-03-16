@@ -42,6 +42,7 @@ const plans = [
 export default function PricingPage() {
   const [searchParams] = useSearchParams();
   const isUpgrade = searchParams.get('upgrade') === 'true';
+  const storeName = searchParams.get('storeName') || '';
 
   return (
     <div className="min-h-screen bg-[#1c1917] text-stone-200">
@@ -126,7 +127,7 @@ export default function PricingPage() {
 
               {/* Botão que passa o plano escolhido via URL */}
               <Link
-                to={`/register?plan=${plan.id}&price=${plan.price}&name=${encodeURIComponent(plan.name)}${isUpgrade ? '&upgrade=true' : ''}`}
+                to={`/register?plan=${plan.id}&price=${plan.price}&name=${encodeURIComponent(plan.name)}${isUpgrade ? '&upgrade=true' : ''}${storeName ? `&storeName=${encodeURIComponent(storeName)}` : ''}`}
                 className={`flex items-center justify-center gap-2 w-full py-4 rounded-2xl font-bold transition-all ${
                   plan.popular
                     ? 'bg-orange-500 text-stone-900 hover:bg-orange-400'

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { CreditCard, Calendar, AlertTriangle, CheckCircle2, Clock, Zap, Rocket, Shield } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { motion } from 'framer-motion';
 
@@ -122,13 +123,13 @@ export default function SubscriptionWidget() {
           <div className="flex items-center gap-3">
             <h3 className="text-xs font-black text-stone-400 uppercase tracking-widest">Minha Assinatura</h3>
             {safeData.payment_status === 'paid' && data && (
-              <a 
-                href="/pricing?upgrade=true"
+              <Link 
+                to={`/pricing?upgrade=true&storeName=${encodeURIComponent(safeData.name)}`}
                 className="px-2.5 py-1 bg-stone-800 hover:bg-stone-700 text-stone-300 rounded text-[10px] font-black uppercase tracking-wider transition-colors flex items-center gap-1"
                 title="Mudar de Plano (Upgrade/Downgrade)"
               >
                 Mudar Plano
-              </a>
+              </Link>
             )}
           </div>
           {(!data || safeData.payment_status !== 'paid') && (
