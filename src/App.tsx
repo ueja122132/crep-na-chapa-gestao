@@ -61,6 +61,10 @@ const DashboardContent = () => {
                     (Array.isArray(profile?.organizations) ? profile?.organizations[0]?.name : profile?.organizations?.name) || 
                     'Sistema de Gestão';
 
+  useEffect(() => {
+    document.title = `${storeName} | Painel`;
+  }, [storeName]);
+
   return (
     <div className="min-h-screen bg-stone-50 text-stone-900 font-sans">
       {/* Header */}
