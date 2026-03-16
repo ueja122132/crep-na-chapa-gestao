@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Check, Rocket, Shield, Zap, ArrowRight, Star } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 
 const plans = [
   {
@@ -40,6 +40,9 @@ const plans = [
 ];
 
 export default function PricingPage() {
+  const [searchParams] = useSearchParams();
+  const isUpgrade = searchParams.get('upgrade') === 'true';
+
   return (
     <div className="min-h-screen bg-[#1c1917] text-stone-200">
       {/* Background Decor */}
@@ -123,14 +126,14 @@ export default function PricingPage() {
 
               {/* Botão que passa o plano escolhido via URL */}
               <Link
-                to={`/register?plan=${plan.id}&price=${plan.price}&name=${encodeURIComponent(plan.name)}`}
+                to={`/register?plan=${plan.id}&price=${plan.price}&name=${encodeURIComponent(plan.name)}${isUpgrade ? '&upgrade=true' : ''}`}
                 className={`flex items-center justify-center gap-2 w-full py-4 rounded-2xl font-bold transition-all ${
                   plan.popular
                     ? 'bg-orange-500 text-stone-900 hover:bg-orange-400'
                     : 'bg-stone-800 text-white hover:bg-stone-700'
                 }`}
               >
-                Começar com {plan.name}
+                {isUpgrade ? `Fazer Upgrade para ${plan.name}` : `Começar com ${plan.name}`}
                 <ArrowRight className="w-5 h-5" />
               </Link>
             </motion.div>
