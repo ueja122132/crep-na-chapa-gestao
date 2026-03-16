@@ -185,7 +185,7 @@ export default function SubscriptionWidget() {
       </motion.div>
 
       {/* PIX Payment Area */}
-      {showPixPay && data.payment_status !== 'paid' && (
+      {showPixPay && safeData.payment_status !== 'paid' && (
         <motion.div 
           initial={{ opacity: 0, height: 0 }}
           animate={{ opacity: 1, height: 'auto' }}
