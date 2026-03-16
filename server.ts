@@ -72,6 +72,35 @@ async function getOrganizationFromAuth(authHeader: string | undefined) {
   }
 }
 
+// Middleware to require Super Admin role
+async function requireSuperAdmin(req: any, res: any, next: any) {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const token = authHeader.split(' ')[1];
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    
+    if (authError || !user) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { data: profile } = await supabase
+      .from('user_profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+
+    if (profile?.role === 'super_admin') {
+      next();
+    } else {
+      res.status(403).json({ error: 'Forbidden: Super Admin access required' });
+    }
+  } catch (error) {
+    res.status(500).json({ error: 'Internal server error validating role' });
+  }
+}
+
 // SQLite initialization removed for Supabase migration
 
 async function startServer() {
@@ -389,6 +418,57 @@ async function startServer() {
     } catch (error) {
       console.error("Error fetching finance stats:", error);
       res.status(500).json({ error: "Internal server error fetching finance stats" });
+    }
+  });
+
+  // Super Admin Routes
+  app.get("/api/admin/stats", requireSuperAdmin, async (req, res) => {
+    try {
+      const { data: stats } = await supabase.from('admin_organization_stats').select('*');
+      
+      const globalStats = {
+        total_revenue: stats?.reduce((acc: number, curr: any) => acc + Number(curr.total_sales), 0) || 0,
+        total_orders: stats?.reduce((acc: number, curr: any) => acc + Number(curr.total_orders), 0) || 0,
+        active_stores: stats?.filter((s: any) => s.status === 'active').length || 0,
+        total_stores: stats?.length || 0
+      };
+
+      res.json(globalStats);
+    } catch (error) {
+      res.status(500).json({ error: 'Error fetching global stats' });
+    }
+  });
+
+  app.get("/api/admin/organizations", requireSuperAdmin, async (req, res) => {
+    try {
+      const { data, error } = await supabase
+        .from('admin_organization_stats')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      res.json(data);
+    } catch (error) {
+      res.status(500).json({ error: 'Error fetching organizations' });
+    }
+  });
+
+  app.patch("/api/admin/organizations/:id", requireSuperAdmin, async (req, res) => {
+    try {
+      const { plan, status } = req.body;
+      const updates: any = {};
+      if (plan) updates.plan = plan;
+      if (status) updates.status = status;
+
+      const { error } = await supabase
+        .from('organizations')
+        .update(updates)
+        .eq('id', req.params.id);
+
+      if (error) throw error;
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: 'Error updating organization' });
     }
   });
 

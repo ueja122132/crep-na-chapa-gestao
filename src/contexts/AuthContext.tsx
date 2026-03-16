@@ -9,6 +9,7 @@ interface UserProfile {
   organizations?: {
     name: string;
   } | { name: string }[];
+  role?: string;
 }
 
 interface AuthContextType {

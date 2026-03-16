@@ -11,7 +11,8 @@ import {
   Clock,
   XCircle,
   ShoppingBag,
-  Package
+  Package,
+  Shield
 } from 'lucide-react';
 import { Product, Order, FinanceStat } from './types';
 
@@ -26,10 +27,11 @@ import MenuManager from './components/MenuManager';
 import FinancialDashboard from './components/FinancialDashboard';
 import DeliveryScreen from './components/DeliveryScreen';
 import { LoginPage } from './pages/LoginPage';
+import SuperAdminPage from './pages/SuperAdminPage';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { LogOut } from 'lucide-react';
 
-type Tab = 'vendas' | 'cozinha' | 'entrega' | 'cardapio' | 'financeiro';
+type Tab = 'vendas' | 'cozinha' | 'entrega' | 'cardapio' | 'financeiro' | 'admin';
 
 const ProtectedRoute = ({ children }: { children: ReactNode }) => {
   const { session, loading } = useAuth();
@@ -87,6 +89,14 @@ const DashboardContent = () => {
             
             <div className="flex items-center gap-4">
               <nav className="hidden md:flex space-x-1">
+                {profile?.role === 'super_admin' && (
+                  <TabButton 
+                    active={activeTab === 'admin'} 
+                    onClick={() => setActiveTab('admin')}
+                    icon={<Shield className="w-4 h-4" />}
+                    label="Admin"
+                  />
+                )}
                 <TabButton 
                   active={activeTab === 'vendas'} 
                   onClick={() => setActiveTab('vendas')}
@@ -146,6 +156,7 @@ const DashboardContent = () => {
             {activeTab === 'entrega' && <DeliveryScreen />}
             {activeTab === 'cardapio' && <MenuManager />}
             {activeTab === 'financeiro' && <FinancialDashboard />}
+            {activeTab === 'admin' && profile?.role === 'super_admin' && <SuperAdminPage />}
           </motion.div>
         </AnimatePresence>
       </main>
