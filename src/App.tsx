@@ -63,13 +63,19 @@ const DashboardContent = () => {
                     (Array.isArray(profile?.organizations) ? profile?.organizations[0]?.name : profile?.organizations?.name) || 
                     'Sistema de Gestão';
 
-  const isSuperAdmin = profile?.role === 'super_admin' || user?.email === 'superadmin@gmail.com';
+  const isSuperAdmin = profile?.role === 'super_admin' || 
+                       user?.email?.toLowerCase() === 'superadmin@gmail.com' ||
+                       user?.email?.toLowerCase() === 'admin@crepnachapa.com';
 
   useEffect(() => {
+    console.log('App Debug - User Email:', user?.email);
+    console.log('App Debug - Profile Role:', profile?.role);
+    console.log('App Debug - isSuperAdmin:', isSuperAdmin);
+    
     if (isSuperAdmin && activeTab !== 'admin') {
       setActiveTab('admin');
     }
-  }, [isSuperAdmin]);
+  }, [isSuperAdmin, user, profile]);
 
   useEffect(() => {
     document.title = isSuperAdmin ? 'SaaS Admin | Crep na Chapa' : `${storeName} | Painel`;

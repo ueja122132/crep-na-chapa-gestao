@@ -110,15 +110,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signOut = async () => {
     console.log('AuthContext: Signing out...');
     try {
-      // Limpeza imediata do estado local para feedback instantâneo
+      // Limpeza imediata do estado local
       setSession(null);
       setUser(null);
       setProfile(null);
       setLoading(false);
       
       await supabase.auth.signOut();
+      
+      // Forçar redirecionamento e recarregamento para limpar cache do navegador
+      window.location.href = '/login';
     } catch (error) {
       console.error('Error during sign out:', error);
+      // Fallback em caso de erro no signOut do Supabase
+      window.location.href = '/login';
     }
   };
 
