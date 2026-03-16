@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Settings, DollarSign, Save, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { motion } from 'motion/react';
+import SubscriptionWidget from './SubscriptionWidget';
 
 export default function SettingsManager() {
   const { session } = useAuth();
@@ -65,6 +66,9 @@ export default function SettingsManager() {
         <h2 className="text-2xl font-bold text-stone-800">Ajustes da Unidade</h2>
         <p className="text-stone-500">Configure os parâmetros operacionais da sua loja</p>
       </div>
+
+      {/* Widget de Assinatura */}
+      <SubscriptionWidget />
 
       <div className="bg-white rounded-[2rem] shadow-sm border border-stone-200 overflow-hidden">
         <div className="p-8 border-b border-stone-100 flex items-center gap-4">

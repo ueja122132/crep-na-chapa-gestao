@@ -602,6 +602,44 @@ async function startServer() {
     }
   });
 
+  // Subscription info for logged-in store
+  app.get("/api/subscription", async (req, res) => {
+    try {
+      const orgId = await getOrganizationFromAuth(req.headers.authorization);
+      const { data, error } = await supabase
+        .from('organizations')
+        .select('name, plan, status, payment_status, subscription_expires_at, created_at')
+        .eq('id', orgId)
+        .single();
+      if (error) throw error;
+      res.json(data);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Confirm payment for a store (Super Admin)
+  app.patch("/api/admin/organizations/:id/payment", requireSuperAdmin, async (req, res) => {
+    try {
+      const { payment_status, subscription_expires_at } = req.body;
+      const updates: any = {};
+      if (payment_status) updates.payment_status = payment_status;
+      if (subscription_expires_at) updates.subscription_expires_at = subscription_expires_at;
+      // If confirming payment, also set plan to active
+      if (payment_status === 'paid') updates.status = 'active';
+
+      const { error } = await supabase
+        .from('organizations')
+        .update(updates)
+        .eq('id', req.params.id);
+      if (error) throw error;
+      res.json({ success: true });
+    } catch (err: any) {
+      console.error('Error confirming payment:', err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // Health check
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok" });

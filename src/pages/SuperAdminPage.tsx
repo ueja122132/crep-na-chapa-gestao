@@ -22,7 +22,11 @@ import {
   Users,
   ArrowUpRight,
   ArrowDownRight,
-  ChevronDown
+  ChevronDown,
+  UserPlus,
+  Calendar,
+  Clock,
+  Mail
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -30,11 +34,15 @@ interface StoreMetric {
   id: string;
   name: string;
   slug: string;
-  plan: 'basic' | 'pro' | 'enterprise';
+  plan: string;
   status: 'active' | 'inactive';
   total_orders: number;
   total_sales: number;
   created_at: string;
+  payment_status?: string;
+  subscription_expires_at?: string;
+  owner_email?: string;
+  owner_name?: string;
 }
 
 interface RankingItem {
@@ -51,11 +59,19 @@ interface GlobalStats {
   average_ticket: number;
 }
 
-const PLAN_LABELS: Record<string, string> = { basic: 'Basic', pro: 'Pro', enterprise: 'Enterprise' };
+const PLAN_LABELS: Record<string, string> = { basic: 'Basic', pro: 'Pro', essencial: 'Essencial', profissional: 'Profissional', enterprise: 'Enterprise' };
 const PLAN_COLORS: Record<string, string> = {
   basic: 'bg-stone-700 text-stone-300',
+  essencial: 'bg-orange-500/20 text-orange-300 border border-orange-500/30',
   pro: 'bg-blue-500/20 text-blue-300 border border-blue-500/30',
-  enterprise: 'bg-purple-500/20 text-purple-300 border border-purple-500/30',
+  profissional: 'bg-purple-500/20 text-purple-300 border border-purple-500/30',
+  enterprise: 'bg-blue-500/20 text-blue-300 border border-blue-500/30',
+};
+
+const PAYMENT_STATUS: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
+  paid: { label: 'Pago', color: 'text-green-400 bg-green-500/10 border-green-500/20', icon: <CheckCircle2 className="w-3 h-3" /> },
+  pending: { label: 'Pendente', color: 'text-yellow-400 bg-yellow-500/10 border-yellow-500/20', icon: <Clock className="w-3 h-3" /> },
+  overdue: { label: 'Em Atraso', color: 'text-red-400 bg-red-500/10 border-red-500/20', icon: <AlertCircle className="w-3 h-3" /> },
 };
 
 export default function SuperAdminPage() {
@@ -199,17 +215,23 @@ export default function SuperAdminPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center gap-1 p-1 bg-stone-900/60 border border-stone-800 rounded-2xl w-fit">
+      <div className="flex flex-wrap items-center gap-1 p-1 bg-stone-900/60 border border-stone-800 rounded-2xl w-fit">
         {[
           { id: 'dashboard', label: 'Visão Geral', icon: <BarChart3 className="w-4 h-4" /> },
           { id: 'stores', label: 'Lojas', icon: <Building2 className="w-4 h-4" /> },
+          { id: 'signups', label: 'Cadastros', icon: <UserPlus className="w-4 h-4" />, badge: stores.filter(s => s.payment_status === 'pending').length },
           { id: 'config', label: 'Sistema', icon: <Settings className="w-4 h-4" /> }
         ].map((tab) => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id as any)}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+            className={`relative flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
               activeTab === tab.id ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20' : 'text-stone-500 hover:text-stone-300'
             }`}>
             {tab.icon}{tab.label}
+            {(tab as any).badge > 0 && (
+              <span className="absolute -top-1 -right-1 w-4 h-4 bg-yellow-500 text-stone-900 text-[8px] font-black rounded-full flex items-center justify-center">
+                {(tab as any).badge}
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -417,6 +439,147 @@ export default function SuperAdminPage() {
               <div className="py-20 text-center">
                 <Building2 className="w-16 h-16 text-stone-800 mx-auto mb-4 border border-stone-800 p-4 rounded-2xl" />
                 <p className="text-stone-600 font-bold uppercase tracking-widest text-xs">Nenhuma loja encontrada</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ===== SIGNUPS / CADASTROS TAB ===== */}
+      {activeTab === 'signups' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-black text-white uppercase text-sm tracking-widest">Novos Cadastros & Assinaturas</h3>
+              <p className="text-stone-500 text-xs mt-1">Gerencie planos, pagamentos e vencimentos das lojas</p>
+            </div>
+            <div className="flex items-center gap-3 text-xs font-bold">
+              <span className="flex items-center gap-1.5 text-yellow-400"><Clock className="w-3.5 h-3.5" />{stores.filter(s => s.payment_status === 'pending').length} Pendentes</span>
+              <span className="flex items-center gap-1.5 text-green-400"><CheckCircle2 className="w-3.5 h-3.5" />{stores.filter(s => s.payment_status === 'paid').length} Pagos</span>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            {stores.map((store) => {
+              const payInfo = PAYMENT_STATUS[store.payment_status || 'pending'] || PAYMENT_STATUS.pending;
+              const expiresAt = store.subscription_expires_at ? new Date(store.subscription_expires_at) : null;
+              const now = new Date();
+              const daysLeft = expiresAt ? Math.ceil((expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : null;
+              const isExpiringSoon = daysLeft !== null && daysLeft <= 5 && daysLeft > 0;
+              const isExpired = daysLeft !== null && daysLeft <= 0;
+              return (
+                <motion.div key={store.id} layout
+                  className={`bg-stone-900/50 border rounded-2xl p-5 space-y-4 ${
+                    isExpired ? 'border-red-500/30 bg-red-500/5' : 
+                    isExpiringSoon ? 'border-yellow-500/30' : 
+                    store.payment_status === 'pending' ? 'border-yellow-500/20' : 'border-stone-800'
+                  }`}>
+                  <div className="flex flex-col md:flex-row md:items-center gap-4">
+                    {/* Info principal */}
+                    <div className="flex items-center gap-3 flex-1">
+                      <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white font-black flex-shrink-0">
+                        {store.name.charAt(0)}
+                      </div>
+                      <div>
+                        <p className="font-black text-white text-sm uppercase">{store.name}</p>
+                        <p className="text-[10px] text-stone-500 font-mono">{store.slug}</p>
+                        {store.owner_email && (
+                          <p className="text-[10px] text-stone-500 flex items-center gap-1 mt-0.5">
+                            <Mail className="w-3 h-3" />{store.owner_email}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Plano */}
+                    <div className="flex flex-wrap items-center gap-3">
+                      <span className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1.5 rounded-lg border ${PLAN_COLORS[store.plan] || 'bg-stone-700 text-stone-300'}`}>
+                        {PLAN_LABELS[store.plan] || store.plan}
+                      </span>
+
+                      {/* Status Pagamento */}
+                      <span className={`flex items-center gap-1.5 text-[10px] font-black uppercase px-2.5 py-1.5 rounded-lg border ${payInfo.color}`}>
+                        {payInfo.icon}{payInfo.label}
+                      </span>
+
+                      {/* Vencimento */}
+                      {expiresAt && (
+                        <span className={`flex items-center gap-1.5 text-[10px] font-black px-2.5 py-1.5 rounded-lg border ${
+                          isExpired ? 'text-red-400 bg-red-500/10 border-red-500/20' : 
+                          isExpiringSoon ? 'text-yellow-400 bg-yellow-500/10 border-yellow-500/20' : 
+                          'text-stone-400 bg-stone-800 border-stone-700'
+                        }`}>
+                          <Calendar className="w-3 h-3" />
+                          {expiresAt.toLocaleDateString('pt-BR')}
+                          {daysLeft !== null && daysLeft > 0 && ` (${daysLeft}d)`}
+                          {isExpired && ' — EXPIRADO'}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Ação: Confirmar Pagamento */}
+                    {store.payment_status !== 'paid' && (
+                      <button
+                        onClick={async () => {
+                          setUpdatingId(store.id);
+                          try {
+                            const nextExpiry = new Date();
+                            nextExpiry.setDate(nextExpiry.getDate() + 30);
+                            const res = await fetch(`/api/admin/organizations/${store.id}/payment`, {
+                              method: 'PATCH',
+                              headers,
+                              body: JSON.stringify({ payment_status: 'paid', subscription_expires_at: nextExpiry.toISOString() })
+                            });
+                            if (!res.ok) throw new Error('Erro ao confirmar');
+                            setStores(prev => prev.map(s => s.id === store.id ? { ...s, payment_status: 'paid', subscription_expires_at: nextExpiry.toISOString() } : s));
+                            showSuccess(`Pagamento de ${store.name} confirmado! +30 dias.`);
+                          } catch (e: any) {
+                            setError(e.message);
+                          } finally {
+                            setUpdatingId(null);
+                          }
+                        }}
+                        disabled={updatingId === store.id}
+                        className="flex items-center gap-2 px-4 py-2.5 bg-green-500/10 border border-green-500/30 text-green-400 hover:bg-green-500 hover:text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all active:scale-95 disabled:opacity-50 flex-shrink-0">
+                        {updatingId === store.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                        Confirmar Pagamento
+                      </button>
+                    )}
+                    {store.payment_status === 'paid' && (
+                      <button
+                        onClick={async () => {
+                          setUpdatingId(store.id);
+                          try {
+                            const nextExpiry = new Date();
+                            nextExpiry.setDate(nextExpiry.getDate() + 30);
+                            const res = await fetch(`/api/admin/organizations/${store.id}/payment`, {
+                              method: 'PATCH',
+                              headers,
+                              body: JSON.stringify({ subscription_expires_at: nextExpiry.toISOString() })
+                            });
+                            if (!res.ok) throw new Error('Erro ao renovar');
+                            setStores(prev => prev.map(s => s.id === store.id ? { ...s, subscription_expires_at: nextExpiry.toISOString() } : s));
+                            showSuccess(`Assinatura de ${store.name} renovada por +30 dias!`);
+                          } catch (e: any) {
+                            setError(e.message);
+                          } finally {
+                            setUpdatingId(null);
+                          }
+                        }}
+                        disabled={updatingId === store.id}
+                        className="flex items-center gap-2 px-4 py-2.5 bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 hover:bg-indigo-500 hover:text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all active:scale-95 disabled:opacity-50 flex-shrink-0">
+                        {updatingId === store.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                        Renovar +30 dias
+                      </button>
+                    )}
+                  </div>
+                </motion.div>
+              );
+            })}
+            {stores.length === 0 && (
+              <div className="py-20 text-center">
+                <UserPlus className="w-16 h-16 text-stone-800 mx-auto mb-4 p-4 border border-stone-800 rounded-2xl" />
+                <p className="text-stone-600 font-bold uppercase tracking-widest text-xs">Nenhum cadastro encontrado</p>
               </div>
             )}
           </div>

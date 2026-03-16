@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom';
 
 const plans = [
   {
+    id: 'essencial',
     name: 'Essencial',
     price: '99',
     description: 'Perfeito para creperias que estão começando.',
@@ -16,9 +17,11 @@ const plans = [
       'Suporte via E-mail'
     ],
     icon: <Zap className="w-6 h-6 text-orange-500" />,
-    popular: false
+    popular: false,
+    color: 'orange'
   },
   {
+    id: 'profissional',
     name: 'Profissional',
     price: '189',
     description: 'Para quem quer crescer com agilidade e dados.',
@@ -31,9 +34,11 @@ const plans = [
       'Suporte Prioritário'
     ],
     icon: <Rocket className="w-6 h-6 text-purple-500" />,
-    popular: true
+    popular: true,
+    color: 'purple'
   },
   {
+    id: 'enterprise',
     name: 'Enterprise',
     price: '450',
     description: 'Solução completa para grandes redes e franquias.',
@@ -46,7 +51,8 @@ const plans = [
       'Gerente de Conta'
     ],
     icon: <Shield className="w-6 h-6 text-blue-500" />,
-    popular: false
+    popular: false,
+    color: 'blue'
   }
 ];
 
@@ -70,14 +76,14 @@ export default function PricingPage() {
             <Star className="w-4 h-4 fill-current" />
             <span>Planos Sob Medida</span>
           </motion.div>
-          <motion.h1 
+          <motion.h1
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             className="text-4xl md:text-6xl font-bold text-white mb-6 tracking-tight"
           >
             Sua Creperia em Outro <span className="text-orange-500">Nível</span>.
           </motion.h1>
-          <motion.p 
+          <motion.p
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
@@ -96,8 +102,8 @@ export default function PricingPage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.1 }}
               className={`relative p-8 rounded-3xl border ${
-                plan.popular 
-                  ? 'bg-stone-900 border-orange-500/50 shadow-2xl shadow-orange-500/5' 
+                plan.popular
+                  ? 'bg-stone-900 border-orange-500/50 shadow-2xl shadow-orange-500/5'
                   : 'bg-stone-900/50 border-stone-800'
               } flex flex-col h-full overflow-hidden`}
             >
@@ -132,15 +138,16 @@ export default function PricingPage() {
                 ))}
               </ul>
 
+              {/* Botão que passa o plano escolhido via URL */}
               <Link
-                to="/register"
+                to={`/register?plan=${plan.id}&price=${plan.price}&name=${encodeURIComponent(plan.name)}`}
                 className={`flex items-center justify-center gap-2 w-full py-4 rounded-2xl font-bold transition-all ${
                   plan.popular
                     ? 'bg-orange-500 text-stone-900 hover:bg-orange-400'
                     : 'bg-stone-800 text-white hover:bg-stone-700'
                 }`}
               >
-                Começar Agora
+                Começar com {plan.name}
                 <ArrowRight className="w-5 h-5" />
               </Link>
             </motion.div>
@@ -149,7 +156,7 @@ export default function PricingPage() {
 
         {/* Footer/Contact */}
         <div className="text-center text-stone-500 text-sm">
-          <p>Precisa de um plano customizado? <Link to="/contact" className="text-orange-500 font-medium hover:underline">Fale com um consultor</Link></p>
+          <p>Precisa de um plano customizado? <Link to="/login" className="text-orange-500 font-medium hover:underline">Fale com um consultor</Link></p>
         </div>
       </div>
     </div>
