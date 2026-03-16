@@ -31,7 +31,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.warn('AuthContext: Loading fail-safe triggered (timeout)');
         setLoading(false);
       }
-    }, 10000);
+    }, 3000); // Reduzido para 3 segundos para melhor percepção de velocidade
     return () => clearTimeout(timer);
   }, [loading]);
 
@@ -41,32 +41,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (initialized.current) return;
     initialized.current = true;
 
-    console.log('AuthContext: Initializing session...');
+    console.log('AuthContext: Initializing auth listener...');
     
-    // Get initial session
-    supabase.auth.getSession()
-      .then(({ data: { session } }) => {
-        console.log('AuthContext: Session retrieved:', !!session);
-        setSession(session);
-        setUser(session?.user ?? null);
-        if (session?.user) {
-          fetchProfile(session.user.id);
-        } else {
-          setLoading(false);
-        }
-      })
-      .catch(err => {
-        if (err.name !== 'AbortError') {
-          console.error('AuthContext: Error getting session:', err);
-        }
-        setLoading(false);
-      });
-
-    // Listen for auth changes
+    // Listen for auth changes - This also triggers for the initial session
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       console.log('AuthContext: Auth state change:', _event);
       setSession(session);
       setUser(session?.user ?? null);
+      
       if (session?.user) {
         await fetchProfile(session.user.id);
       } else {
@@ -110,13 +92,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     } finally {
       fetchProfileInProgress.current = null;
-      console.log('AuthContext: Setting loading to false (fetchProfile)');
+      console.log('AuthContext: Setting loading to false');
       setLoading(false);
     }
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    console.log('AuthContext: Signing out...');
+    try {
+      // Limpeza imediata do estado local para feedback instantâneo
+      setSession(null);
+      setUser(null);
+      setProfile(null);
+      setLoading(false);
+      
+      await supabase.auth.signOut();
+    } catch (error) {
+      console.error('Error during sign out:', error);
+    }
   };
 
   return (
