@@ -83,7 +83,17 @@ async function requireSuperAdmin(req: any, res: any, next: any) {
     const token = authHeader.split(' ')[1];
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     
-    if (authError || !user) return res.status(401).json({ error: 'Unauthorized' });
+    if (authError || !user) {
+      console.error('requireSuperAdmin: Auth error resolving user:', authError);
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    // Email direct fallback (Highest priority/reliability)
+    const rootEmails = ['superadmin@gmail.com', 'admin@crepnachapa.com'];
+    if (user.email && rootEmails.includes(user.email.toLowerCase())) {
+      console.log(`requireSuperAdmin: GRANTED root access to ${user.email}`);
+      return next();
+    }
 
     const { data: profile } = await supabase
       .from('user_profiles')
@@ -92,11 +102,14 @@ async function requireSuperAdmin(req: any, res: any, next: any) {
       .single();
 
     if (profile?.role === 'super_admin') {
+      console.log(`requireSuperAdmin: GRANTED access to ${user.email} (Role: super_admin)`);
       next();
     } else {
+      console.warn(`requireSuperAdmin: DENIED access for ${user.email} (Role: ${profile?.role})`);
       res.status(403).json({ error: 'Forbidden: Super Admin access required' });
     }
-  } catch (error) {
+  } catch (error: any) {
+    console.error('requireSuperAdmin: Internal Exception:', error.message);
     res.status(500).json({ error: 'Internal server error validating role' });
   }
 }
