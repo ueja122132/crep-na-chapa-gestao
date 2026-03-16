@@ -42,7 +42,7 @@ async function getOrganizationFromAuth(authHeader: string | undefined) {
       console.warn(`Profile not found for user ${user.id} (${user.email}). Attempting fallback.`);
       
       // Fallback 1: Check if user email belongs to known admin list or domain
-      const adminEmails = ['admin@crepnachapa.com', 'seu-email-aqui', 'crepnachapa@gmail.com'];
+      const adminEmails = ['admin@crepnachapa.com', 'superadmin@gmail.com', 'crepnachapa@gmail.com'];
       const isAdmin = adminEmails.includes(user.email || '') || (user.email && user.email.endsWith('@crepnachapa.com'));
 
       if (isAdmin) {
