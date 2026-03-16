@@ -19,8 +19,20 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 let currentOrgId: string | null = null;
 async function ensureOrgId() {
   if (currentOrgId) return currentOrgId;
+  console.log('Fetching default organization...');
   const { data, error } = await supabase.from('organizations').select('id').eq('slug', 'crep-na-chapa').single();
-  if (data) currentOrgId = data.id;
+  
+  if (error) {
+    console.error('Error in ensureOrgId:', error);
+    throw error;
+  }
+  
+  if (data) {
+    currentOrgId = data.id;
+    console.log('Org ID resolved:', currentOrgId);
+  } else {
+    console.error('No organization found for slug: crep-na-chapa');
+  }
   return currentOrgId;
 }
 
@@ -59,18 +71,28 @@ async function startServer() {
   app.get("/api/products", async (req, res) => {
     try {
       const orgId = await ensureOrgId();
+      if (!orgId) {
+        return res.status(404).json({ error: "Organization not found" });
+      }
+
+      console.log('Fetching products for org:', orgId);
       const { data, error } = await supabase
         .from("products")
         .select("*")
         .eq('organization_id', orgId);
-      if (error) throw error;
-      res.json(data.map(p => ({ 
+      
+      if (error) {
+        console.error('Supabase error fetching products:', error);
+        throw error;
+      }
+
+      res.json(data.map((p: any) => ({ 
         ...p, 
         ingredients: typeof p.ingredients === 'string' ? JSON.parse(p.ingredients) : (p.ingredients || [])
       })));
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching products:", error);
-      res.status(500).json({ error: "Internal server error fetching products" });
+      res.status(500).json({ error: error.message || "Internal server error fetching products" });
     }
   });
 
