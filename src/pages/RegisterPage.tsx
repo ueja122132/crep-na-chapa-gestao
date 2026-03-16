@@ -23,6 +23,7 @@ export default function RegisterPage() {
   const planPrice = searchParams.get('price') || '50';
   const isUpgrade = searchParams.get('upgrade') === 'true';
   const urlStoreName = searchParams.get('storeName');
+  const urlOrgId = searchParams.get('orgId');
   const planData = PLAN_INFO[planId] || PLAN_INFO.essencial;
 
   const [formData, setFormData] = useState({
@@ -82,37 +83,45 @@ export default function RegisterPage() {
            throw new Error('Sessão expirada. Por favor, faça login novamente.');
          }
 
-         let orgId = profile?.organization_id;
+         // Prioridade: ID vindo da URL (mais rápido) > ID do Perfil > Busca por OwnerID
+         let orgId = urlOrgId || profile?.organization_id;
 
-         // Se não houver ID no perfil, tenta buscar pela tabela de organizações
-         if (!orgId && session.user.email) {
+         console.log('Iniciando upgrade para organização:', orgId, { urlOrgId, profileOrgId: profile?.organization_id });
+
+         // Se ainda não houver ID, tenta buscar por owner_id (UUID do usuário)
+         if (!orgId && session.user.id) {
            const { data: ownedOrg } = await supabase
              .from('organizations')
              .select('id')
-             .eq('owner_email', session.user.email)
+             .eq('owner_id', session.user.id)
              .limit(1)
-             .single();
+             .maybeSingle();
            
            if (ownedOrg) orgId = ownedOrg.id;
          }
 
          if (orgId) {
-           // Lógica de Upgrade - Atualização
-           const { error: upgradeError } = await supabase
-             .from('organizations')
-             .update({ 
-                plan: planId, 
-                payment_status: 'pending' 
-             })
-             .eq('id', orgId);
-             
-           if (upgradeError) throw upgradeError;
-           
-           setSuccess(true);
-           setTimeout(() => navigate('/vendas'), 2500);
-           return;
+            console.log('Atualizando plano da loja:', orgId, 'para:', planId);
+            // Lógica de Upgrade - Atualização
+            const { error: upgradeError } = await supabase
+              .from('organizations')
+              .update({ 
+                 plan: planId, 
+                 payment_status: 'pending' 
+              })
+              .eq('id', orgId);
+              
+            if (upgradeError) {
+              console.error('Erro no update da organização:', upgradeError);
+              throw upgradeError;
+            }
+            
+            setSuccess(true);
+            setTimeout(() => navigate('/vendas'), 2500);
+            return;
          } else {
-           // Fluxo híbrido: Usuário logado mas sem loja (Primeira Ativação)
+            console.log('Nenhuma organização encontrada. Criando nova loja para o usuário logado.');
+            // Fluxo híbrido: Usuário logado mas sem loja (Primeira Ativação)
            // Se o usuário não tem nome da loja no formData, pede pra preencher
            if (!formData.storeName) {
              throw new Error('Por favor, informe o nome da sua loja para ativar o plano.');
@@ -131,7 +140,7 @@ export default function RegisterPage() {
                status: 'active',
                payment_status: 'pending',
                subscription_expires_at: expiresAt.toISOString(),
-               owner_email: session.user.email,
+               owner_id: session.user.id,
                owner_name: profile?.full_name || session.user.email,
              }])
              .select()

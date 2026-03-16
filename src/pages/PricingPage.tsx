@@ -127,7 +127,7 @@ export default function PricingPage() {
 
               {/* Botão que passa o plano escolhido via URL */}
               <Link
-                to={`/register?plan=${plan.id}&price=${plan.price}&name=${encodeURIComponent(plan.name)}${isUpgrade ? '&upgrade=true' : ''}${storeName ? `&storeName=${encodeURIComponent(storeName)}` : ''}`}
+                to={`/register?plan=${plan.id}&price=${plan.price}&name=${encodeURIComponent(plan.name)}${isUpgrade ? '&upgrade=true' : ''}${storeName ? `&storeName=${encodeURIComponent(storeName)}` : ''}${searchParams.get('orgId') ? `&orgId=${searchParams.get('orgId')}` : ''}`}
                 className={`flex items-center justify-center gap-2 w-full py-4 rounded-2xl font-bold transition-all ${
                   plan.popular
                     ? 'bg-orange-500 text-stone-900 hover:bg-orange-400'
