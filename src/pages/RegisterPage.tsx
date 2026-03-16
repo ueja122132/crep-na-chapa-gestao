@@ -38,6 +38,31 @@ export default function RegisterPage() {
 
   const hasOrganization = !!(profile?.organization_id || profile?.organizations?.name || profile?.organization_name);
 
+  useEffect(() => {
+    async function loadOrgName() {
+      if (isUpgrade && session?.user?.email) {
+        // 1. Tenta pegar do perfil
+        const profileName = profile?.organization_name || (profile?.organizations as any)?.name;
+        if (profileName && profileName !== 'Autenticada') {
+          setFormData(prev => ({ ...prev, storeName: profileName }));
+          return;
+        }
+
+        // 2. Se não estiver no perfil, busca no banco pelo email do dono
+        const { data: org } = await supabase
+          .from('organizations')
+          .select('name')
+          .eq('owner_email', session.user.email)
+          .limit(1)
+          .single();
+        
+        if (org?.name) {
+          setFormData(prev => ({ ...prev, storeName: org.name }));
+        }
+      }
+    }
+    loadOrgName();
+  }, [isUpgrade, profile, session]);
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
