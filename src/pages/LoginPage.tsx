@@ -2,13 +2,23 @@ import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { motion } from 'framer-motion';
 import { LogIn, Mail, Lock, Loader2, Utensils } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 
 export const LoginPage: React.FC = () => {
+  const navigate = useNavigate();
+  const { session } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Redirecionar se já estiver logado
+  React.useEffect(() => {
+    if (session) {
+      navigate('/vendas', { replace: true });
+    }
+  }, [session, navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -22,6 +32,9 @@ export const LoginPage: React.FC = () => {
       });
 
       if (error) throw error;
+      
+      // Forçar navegação após sucesso
+      navigate('/vendas', { replace: true });
     } catch (err: any) {
       setError(err.message || 'Erro ao realizar login');
     } finally {
