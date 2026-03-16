@@ -20,11 +20,19 @@ export default function MenuManager() {
 
   const fetchProducts = async () => {
     if (!session) return;
-    const res = await fetch('/api/products', {
-      headers: { 'Authorization': `Bearer ${session.access_token}` }
-    });
-    const data = await res.json();
-    setProducts(data);
+    try {
+      const res = await fetch('/api/products', {
+        headers: { 'Authorization': `Bearer ${session.access_token}` }
+      });
+      if (!res.ok) throw new Error('Failed to fetch products');
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        setProducts(data);
+      }
+    } catch (err) {
+      console.error('Error fetching products:', err);
+      setProducts([]);
+    }
   };
 
   const addIngredient = () => {

@@ -39,15 +39,30 @@ async function getOrganizationFromAuth(authHeader: string | undefined) {
       .single();
 
     if (profileError || !profile) {
-      console.warn(`Profile not found for user ${user.id} (${user.email}). Falling back to main org if admin.`);
+      console.warn(`Profile not found for user ${user.id} (${user.email}). Attempting fallback.`);
       
-      // Fallback for main admin if profile is missing
-      if (user.email === 'admin@crepnachapa.com' || user.email === 'seu-email-aqui') {
+      // Fallback 1: Check if user email belongs to known admin list or domain
+      const adminEmails = ['admin@crepnachapa.com', 'seu-email-aqui', 'crepnachapa@gmail.com'];
+      const isAdmin = adminEmails.includes(user.email || '') || (user.email && user.email.endsWith('@crepnachapa.com'));
+
+      if (isAdmin) {
          const { data: mainOrg } = await supabase.from('organizations').select('id').eq('slug', 'crep-na-chapa').single();
-         if (mainOrg) return mainOrg.id;
+         if (mainOrg) {
+           console.log(`Fallback successful: Mapping admin ${user.email} to main organization.`);
+           return mainOrg.id;
+         }
+      }
+
+      // Fallback 2: If there's only one organization in the whole system (bootstrap phase)
+      const { data: orgs } = await supabase.from('organizations').select('id');
+      if (orgs && orgs.length === 1) {
+        console.log('Single organization detected. Defaulting context.');
+        return orgs[0].id;
       }
       
-      throw new Error('Organization context not found. Please complete your registration.');
+      const errorMsg = 'Organization context not found. Please complete your registration or contact support.';
+      console.error(errorMsg);
+      throw new Error(errorMsg);
     }
 
     return profile.organization_id;

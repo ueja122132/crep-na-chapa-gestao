@@ -54,10 +54,14 @@ export default function FinancialDashboard() {
       const res = await fetch('/api/finance/stats', {
         headers: { 'Authorization': `Bearer ${session.access_token}` }
       });
+      if (!res.ok) throw new Error('Failed to fetch stats');
       const data = await res.json();
-      setStats(data);
+      if (Array.isArray(data)) {
+        setStats(data);
+      }
     } catch (err) {
-      console.error(err);
+      console.error('Error fetching stats:', err);
+      // Don't set state with error object
     } finally {
       setLoading(false);
     }

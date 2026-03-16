@@ -33,7 +33,9 @@ export default function OrderTerminal() {
           'Authorization': `Bearer ${session?.access_token}`
         }
       });
+      if (!res.ok) throw new Error('Failed to fetch settings');
       const data = await res.json();
+      if (!Array.isArray(data)) return;
       const priceSetting = data.find((s: any) => s.key === 'extra_ingredient_price');
       if (priceSetting) {
         setExtraPrice(parseFloat(priceSetting.value));
@@ -47,13 +49,21 @@ export default function OrderTerminal() {
 
   const fetchProducts = async () => {
     if (!session) return;
-    const res = await fetch('/api/products', {
-      headers: {
-        'Authorization': `Bearer ${session.access_token}`
+    try {
+      const res = await fetch('/api/products', {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      });
+      if (!res.ok) throw new Error('Failed to fetch products');
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        setProducts(data);
       }
-    });
-    const data = await res.json();
-    setProducts(data);
+    } catch (err) {
+      console.error('Error fetching products:', err);
+      setProducts([]); // Fallback to empty array
+    }
   };
 
   const openCustomizer = (product: Product) => {

@@ -54,20 +54,36 @@ export default function DeliveryScreen() {
 
   const fetchOrders = async () => {
     if (!session) return;
-    const res = await fetch('/api/orders', {
-      headers: { 'Authorization': `Bearer ${session.access_token}` }
-    });
-    const data = await res.json();
-    setOrders(data);
+    try {
+      const res = await fetch('/api/orders', {
+        headers: { 'Authorization': `Bearer ${session.access_token}` }
+      });
+      if (!res.ok) throw new Error('Failed to fetch orders');
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        setOrders(data);
+      }
+    } catch (err) {
+      console.error('Error fetching orders:', err);
+      setOrders([]);
+    }
   };
 
   const fetchProducts = async () => {
     if (!session) return;
-    const res = await fetch('/api/products', {
-      headers: { 'Authorization': `Bearer ${session.access_token}` }
-    });
-    const data = await res.json();
-    setProducts(data);
+    try {
+      const res = await fetch('/api/products', {
+        headers: { 'Authorization': `Bearer ${session.access_token}` }
+      });
+      if (!res.ok) throw new Error('Failed to fetch products');
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        setProducts(data);
+      }
+    } catch (err) {
+      console.error('Error fetching products:', err);
+      setProducts([]);
+    }
   };
 
   const markAsPaid = async (order: Order) => {
