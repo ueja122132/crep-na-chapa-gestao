@@ -15,25 +15,34 @@ const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL ||
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || "";
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// Utility to get current organization (mocking for now until auth is added)
-let currentOrgId: string | null = null;
-async function ensureOrgId() {
-  if (currentOrgId) return currentOrgId;
-  console.log('Fetching default organization...');
-  const { data, error } = await supabase.from('organizations').select('id').eq('slug', 'crep-na-chapa').single();
-  
-  if (error) {
-    console.error('Error in ensureOrgId:', error);
-    throw error;
+// Utility to resolve organization from Auth Header
+async function getOrganizationFromAuth(authHeader: string | undefined) {
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    throw new Error('Missing or invalid Authorization header');
   }
+
+  const token = authHeader.split(' ')[1];
   
-  if (data) {
-    currentOrgId = data.id;
-    console.log('Org ID resolved:', currentOrgId);
-  } else {
-    console.error('No organization found for slug: crep-na-chapa');
+  // 1. Get user from token
+  const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+  if (authError || !user) {
+    console.error('Auth error resolving user:', authError);
+    throw new Error('Unauthorized');
   }
-  return currentOrgId;
+
+  // 2. Get organization_id from user_profile
+  const { data: profile, error: profileError } = await supabase
+    .from('user_profiles')
+    .select('organization_id')
+    .eq('id', user.id)
+    .single();
+
+  if (profileError || !profile) {
+    console.error('Error fetching profile for user:', user.id, profileError);
+    throw new Error('Organization context not found');
+  }
+
+  return profile.organization_id;
 }
 
 // SQLite initialization removed for Supabase migration
@@ -47,7 +56,7 @@ async function startServer() {
   // Settings
   app.get('/api/settings', async (req, res) => {
     try {
-      const orgId = await ensureOrgId();
+      const orgId = await getOrganizationFromAuth(req.headers.authorization);
       const { data, error } = await supabase
         .from('settings')
         .select('*')
@@ -70,9 +79,9 @@ async function startServer() {
   // Products (Menu)
   app.get("/api/products", async (req, res) => {
     try {
-      const orgId = await ensureOrgId();
+      const orgId = await getOrganizationFromAuth(req.headers.authorization);
       if (!orgId) {
-        return res.status(404).json({ error: "Organization not found" });
+        return res.status(401).json({ error: "Unauthorized" });
       }
 
       console.log('Fetching products for org:', orgId);
@@ -104,7 +113,7 @@ async function startServer() {
         return res.status(400).json({ error: "Missing required fields: name, type, price" });
       }
 
-      const orgId = await ensureOrgId();
+      const orgId = await getOrganizationFromAuth(req.headers.authorization);
       const { data, error } = await supabase.from("products").insert({
         name,
         type,
@@ -115,19 +124,26 @@ async function startServer() {
 
       if (error) throw error;
       res.json(data);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating product:", error);
+      if (error.message === 'Unauthorized' || error.message === 'Missing or invalid Authorization header') {
+        return res.status(401).json({ error: error.message });
+      }
       res.status(500).json({ error: "Internal server error creating product" });
     }
   });
 
   app.delete("/api/products/:id", async (req, res) => {
     try {
-      const { error } = await supabase.from("products").delete().eq("id", req.params.id);
+      const orgId = await getOrganizationFromAuth(req.headers.authorization); // Ensure user is authorized
+      const { error } = await supabase.from("products").delete().eq("id", req.params.id).eq('organization_id', orgId);
       if (error) throw error;
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error deleting product:", error);
+      if (error.message === 'Unauthorized' || error.message === 'Missing or invalid Authorization header') {
+        return res.status(401).json({ error: error.message });
+      }
       res.status(500).json({ error: "Internal server error deleting product" });
     }
   });
@@ -135,7 +151,7 @@ async function startServer() {
   // Orders
   app.get("/api/orders", async (req, res) => {
     try {
-      const orgId = await ensureOrgId();
+      const orgId = await getOrganizationFromAuth(req.headers.authorization);
       const { data: orders, error: ordersError } = await supabase
         .from("orders")
         .select("*, order_items(*)")
@@ -151,8 +167,11 @@ async function startServer() {
           customizations: typeof item.customizations === 'string' ? JSON.parse(item.customizations) : (item.customizations || [])
         }))
       })));
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching orders:", error);
+      if (error.message === 'Unauthorized' || error.message === 'Missing or invalid Authorization header') {
+        return res.status(401).json({ error: error.message });
+      }
       res.status(500).json({ error: "Internal server error fetching orders" });
     }
   });
@@ -166,7 +185,7 @@ async function startServer() {
       }
 
       // Step 1: Create Order
-      const orgId = await ensureOrgId();
+      const orgId = await getOrganizationFromAuth(req.headers.authorization);
       const { data: order, error: orderError } = await supabase
         .from("orders")
         .insert({
@@ -270,7 +289,7 @@ async function startServer() {
   // Finance
   app.get("/api/finance/stats", async (req, res) => {
     try {
-      const orgId = await ensureOrgId();
+      const orgId = await getOrganizationFromAuth(req.headers.authorization);
       // Fallback if RPC not defined or for more detailed data
       const { data: fallbackData, error: fallbackError } = await supabase
         .from("orders")

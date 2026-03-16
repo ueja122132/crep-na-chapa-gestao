@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, Tag, DollarSign, ListChecks } from 'lucide-react';
 import { Product, ProductType } from '../types';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function MenuManager() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -9,13 +10,19 @@ export default function MenuManager() {
   const [price, setPrice] = useState('');
   const [ingredients, setIngredients] = useState<string[]>([]);
   const [newIngredient, setNewIngredient] = useState('');
-
+  const { session } = useAuth();
+ 
   useEffect(() => {
-    fetchProducts();
-  }, []);
+    if (session) {
+      fetchProducts();
+    }
+  }, [session]);
 
   const fetchProducts = async () => {
-    const res = await fetch('/api/products');
+    if (!session) return;
+    const res = await fetch('/api/products', {
+      headers: { 'Authorization': `Bearer ${session.access_token}` }
+    });
     const data = await res.json();
     setProducts(data);
   };
@@ -37,7 +44,10 @@ export default function MenuManager() {
 
     await fetch('/api/products', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session?.access_token}`
+      },
       body: JSON.stringify({
         name,
         type,
@@ -53,7 +63,10 @@ export default function MenuManager() {
   };
 
   const deleteProduct = async (id: number) => {
-    await fetch(`/api/products/${id}`, { method: 'DELETE' });
+    await fetch(`/api/products/${id}`, { 
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${session?.access_token}` }
+    });
     fetchProducts();
   };
 

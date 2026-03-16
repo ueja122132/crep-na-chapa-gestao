@@ -3,6 +3,7 @@ import { Package, CheckCircle2, DollarSign, User, Clock, Banknote, CreditCard, Q
 import { Order, Product } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function DeliveryScreen() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -13,8 +14,11 @@ export default function DeliveryScreen() {
   const [amountReceived, setAmountReceived] = useState<string>('');
   const [editingItem, setEditingItem] = useState<{orderId: number, itemId: number, currentCustoms: string[], productId: number} | null>(null);
   const [extraIngredients, setExtraIngredients] = useState<string[]>([]);
+  const { session } = useAuth();
 
   useEffect(() => {
+    if (!session) return;
+    
     fetchOrders();
     fetchProducts();
 
@@ -44,18 +48,24 @@ export default function DeliveryScreen() {
       supabase.removeChannel(ordersChannel);
       supabase.removeChannel(itemsChannel);
     };
-  }, []);
+  }, [session]);
 
   const allIngredients = Array.from(new Set(products.flatMap(p => p.ingredients))).sort();
 
   const fetchOrders = async () => {
-    const res = await fetch('/api/orders');
+    if (!session) return;
+    const res = await fetch('/api/orders', {
+      headers: { 'Authorization': `Bearer ${session.access_token}` }
+    });
     const data = await res.json();
     setOrders(data);
   };
 
   const fetchProducts = async () => {
-    const res = await fetch('/api/products');
+    if (!session) return;
+    const res = await fetch('/api/products', {
+      headers: { 'Authorization': `Bearer ${session.access_token}` }
+    });
     const data = await res.json();
     setProducts(data);
   };
@@ -63,7 +73,10 @@ export default function DeliveryScreen() {
   const markAsPaid = async (order: Order) => {
     await fetch(`/api/orders/${order.id}/payment`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session?.access_token}`
+      },
       body: JSON.stringify({ 
         payment_status: 'paid',
         payment_method: paymentMethod,
@@ -85,7 +98,10 @@ export default function DeliveryScreen() {
 
     await fetch(`/api/order-items/${editingItem.itemId}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session?.access_token}`
+      },
       body: JSON.stringify({ customizations: finalCustoms })
     });
     
@@ -129,7 +145,10 @@ export default function DeliveryScreen() {
   const markAsDelivered = async (id: number) => {
     await fetch(`/api/orders/${id}/status`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session?.access_token}`
+      },
       body: JSON.stringify({ status: 'delivered' })
     });
     fetchOrders();

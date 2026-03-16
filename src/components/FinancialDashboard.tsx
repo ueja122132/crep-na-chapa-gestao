@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { FinanceStat } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
+import { useAuth } from '../contexts/AuthContext';
 import { 
   BarChart, 
   Bar, 
@@ -39,14 +40,20 @@ export default function FinancialDashboard() {
   const [stats, setStats] = useState<FinanceStat[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'today' | '7d' | '30d' | 'all'>('today');
+  const { session } = useAuth();
 
   useEffect(() => {
-    fetchStats();
-  }, []);
+    if (session) {
+      fetchStats();
+    }
+  }, [session]);
 
   const fetchStats = async () => {
+    if (!session) return;
     try {
-      const res = await fetch('/api/finance/stats');
+      const res = await fetch('/api/finance/stats', {
+        headers: { 'Authorization': `Bearer ${session.access_token}` }
+      });
       const data = await res.json();
       setStats(data);
     } catch (err) {

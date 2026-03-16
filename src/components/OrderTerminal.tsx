@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Plus, Minus, ShoppingCart, User, CheckCircle2, X, CreditCard, Banknote, QrCode, Clock } from 'lucide-react';
 import { Product, OrderItem } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function OrderTerminal() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -16,15 +17,22 @@ export default function OrderTerminal() {
   const [extraIngredients, setExtraIngredients] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [extraPrice, setExtraPrice] = useState(5.0);
+  const { session } = useAuth();
 
   useEffect(() => {
-    fetchProducts();
-    fetchSettings();
-  }, []);
+    if (session) {
+      fetchProducts();
+      fetchSettings();
+    }
+  }, [session]);
 
   const fetchSettings = async () => {
     try {
-      const res = await fetch('/api/settings');
+      const res = await fetch('/api/settings', {
+        headers: {
+          'Authorization': `Bearer ${session?.access_token}`
+        }
+      });
       const data = await res.json();
       const priceSetting = data.find((s: any) => s.key === 'extra_ingredient_price');
       if (priceSetting) {
@@ -38,7 +46,12 @@ export default function OrderTerminal() {
   const allIngredients = Array.from(new Set(products.flatMap(p => p.ingredients))).sort();
 
   const fetchProducts = async () => {
-    const res = await fetch('/api/products');
+    if (!session) return;
+    const res = await fetch('/api/products', {
+      headers: {
+        'Authorization': `Bearer ${session.access_token}`
+      }
+    });
     const data = await res.json();
     setProducts(data);
   };
@@ -105,7 +118,10 @@ export default function OrderTerminal() {
     try {
       await fetch('/api/orders', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`
+        },
         body: JSON.stringify({
           customer_name: customerName || 'Cliente Balcão',
           total_price: total,
