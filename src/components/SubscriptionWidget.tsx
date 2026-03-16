@@ -22,7 +22,8 @@ const PLAN_DISPLAY: Record<string, { label: string; icon: React.ReactNode; color
 };
 
 export default function SubscriptionWidget() {
-  const { session } = useAuth();
+  const { session, profile } = useAuth();
+  const isUpgradeAdmin = profile?.role === 'super_admin' || profile?.role === 'admin';
   const [data, setData] = useState<SubscriptionData | null>(null);
   const [loading, setLoading] = useState(true);
   const [showPixPay, setShowPixPay] = useState(false);
@@ -124,7 +125,7 @@ export default function SubscriptionWidget() {
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <h3 className="text-xs font-black text-stone-400 uppercase tracking-widest">Minha Assinatura</h3>
-            {safeData.payment_status === 'paid' && data && (
+            {isUpgradeAdmin && data && (
               <Link 
                 to={`/pricing?upgrade=true&storeName=${encodeURIComponent(safeData.name)}&orgId=${safeData.id || ''}&v=${Date.now()}`}
                 className="px-2.5 py-1 bg-[#ea580c] hover:bg-[#c2410c] text-white rounded text-[10px] font-black uppercase tracking-wider transition-colors flex items-center gap-1"

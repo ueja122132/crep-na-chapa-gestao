@@ -107,7 +107,10 @@ export default function RegisterPage() {
               .from('organizations')
               .update({ 
                  plan: planId, 
-                 payment_status: 'pending' 
+                 payment_status: 'pending',
+                 // Preservamos a expiração atual ou resetamos? 
+                 // Resetamos para garantir que o novo pagamento cubra o novo período.
+                 subscription_expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
               })
               .eq('id', orgId);
               
@@ -331,7 +334,7 @@ export default function RegisterPage() {
             {isUpgrade && hasOrganization && (
               <div className="p-4 bg-orange-500/10 border border-orange-500/30 rounded-2xl flex items-center gap-3 text-orange-400 text-sm">
                 <Store className="w-5 h-5 flex-shrink-0" />
-                <span>O plano atual da loja <strong>{profile?.organizations?.name || profile?.organization_name || 'Principal'}</strong> será substituído.</span>
+                <span>O plano atual da loja <strong>{profile?.organizations?.name || profile?.organization_name || 'Principal'}</strong> será substituído e um novo pagamento será necessário.</span>
               </div>
             )}
 
