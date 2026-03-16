@@ -119,7 +119,18 @@ export default function SubscriptionWidget() {
         }`}
       >
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-xs font-black text-stone-400 uppercase tracking-widest">Minha Assinatura</h3>
+          <div className="flex items-center gap-3">
+            <h3 className="text-xs font-black text-stone-400 uppercase tracking-widest">Minha Assinatura</h3>
+            {safeData.payment_status === 'paid' && data && (
+              <a 
+                href="/pricing?upgrade=true"
+                className="px-2.5 py-1 bg-stone-800 hover:bg-stone-700 text-stone-300 rounded text-[10px] font-black uppercase tracking-wider transition-colors flex items-center gap-1"
+                title="Mudar de Plano (Upgrade/Downgrade)"
+              >
+                Mudar Plano
+              </a>
+            )}
+          </div>
           {(!data || safeData.payment_status !== 'paid') && (
              <button 
                 onClick={() => setShowPixPay(!showPixPay)}

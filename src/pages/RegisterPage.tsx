@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { User, Mail, Lock, Store, ArrowRight, Loader2, AlertCircle, CheckCircle2, CreditCard, Zap, Rocket, Shield } from 'lucide-react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
 
 const PLAN_INFO: Record<string, { label: string; color: string; icon: React.ReactNode; price: string }> = {
   essencial: { label: 'Essencial', color: 'text-orange-400 border-orange-500/30 bg-orange-500/10', icon: <Zap className="w-4 h-4" />, price: '50,00' },
@@ -12,13 +13,15 @@ const PLAN_INFO: Record<string, { label: string; color: string; icon: React.Reac
 export default function RegisterPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { session, profile } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
   const planId = searchParams.get('plan') || 'essencial';
   const planName = searchParams.get('name') || 'Essencial';
-  const planPrice = searchParams.get('price') || '99';
+  const planPrice = searchParams.get('price') || '50';
+  const isUpgrade = searchParams.get('upgrade') === 'true';
   const planData = PLAN_INFO[planId] || PLAN_INFO.essencial;
 
   const [formData, setFormData] = useState({
@@ -39,6 +42,25 @@ export default function RegisterPage() {
     setError(null);
 
     try {
+      if (isUpgrade && session && profile?.organization_id) {
+         // Lógica de Upgrade
+         const orgId = profile.organization_id;
+         const { error: upgradeError } = await supabase
+           .from('organizations')
+           .update({ 
+              plan: planId, 
+              payment_status: 'pending' // Volta para pendente no novo valor
+           })
+           .eq('id', orgId);
+           
+         if (upgradeError) throw upgradeError;
+         
+         setSuccess(true);
+         setTimeout(() => navigate('/vendas'), 2500);
+         return;
+      }
+
+      // Lógica de Registro Normal
       // 1. Create Auth User
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: formData.email,
@@ -103,8 +125,8 @@ export default function RegisterPage() {
           <div className="w-16 h-16 bg-green-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
             <CheckCircle2 className="w-10 h-10 text-green-500" />
           </div>
-          <h2 className="text-2xl font-bold text-white mb-2">Loja criada com sucesso!</h2>
-          <p className="text-stone-400 mb-2">Plano <span className="font-bold text-white">{planName}</span> ativado.</p>
+          <h2 className="text-2xl font-bold text-white mb-2">{isUpgrade ? 'Plano Alterado!' : 'Loja criada com sucesso!'}</h2>
+          <p className="text-stone-400 mb-2">Plano <span className="font-bold text-white">{planName}</span> {isUpgrade ? 'solicitado.' : 'ativado.'}</p>
           <p className="text-stone-500 text-sm">Redirecionando para o painel...</p>
         </motion.div>
       </div>
@@ -130,8 +152,8 @@ export default function RegisterPage() {
           >
             <Store className="w-8 h-8 text-stone-900" />
           </motion.div>
-          <h1 className="text-3xl font-bold text-white mb-2 tracking-tight">Crie sua loja</h1>
-          <p className="text-stone-400">Comece a gerenciar seu negócio hoje.</p>
+          <h1 className="text-3xl font-bold text-white mb-2 tracking-tight">{isUpgrade ? 'Mudar Plano' : 'Crie sua loja'}</h1>
+          <p className="text-stone-400">{isUpgrade ? 'Confirme as condições para iniciar seu upgrade.' : 'Comece a gerenciar seu negócio hoje.'}</p>
         </div>
 
         {/* Plano selecionado */}
@@ -139,9 +161,9 @@ export default function RegisterPage() {
           {planData.icon}
           <div className="flex-1">
             <p className="font-black text-sm uppercase tracking-widest">Plano {planData.label} selecionado</p>
-            <p className="text-xs opacity-70">R$ {planPrice}/mês · 30 dias de teste grátis</p>
+            <p className="text-xs opacity-70">R$ {planPrice}/mês · {isUpgrade ? 'Pagamento pendente no PIX' : '30 dias de teste grátis'}</p>
           </div>
-          <Link to="/pricing" className="text-xs underline opacity-60 hover:opacity-100">Trocar</Link>
+          <Link to={isUpgrade ? "/pricing?upgrade=true" : "/pricing"} className="text-xs underline opacity-60 hover:opacity-100">Trocar</Link>
         </div>
 
         <div className="bg-stone-900/50 backdrop-blur-xl rounded-3xl p-8 border border-stone-800 shadow-2xl">
@@ -157,48 +179,57 @@ export default function RegisterPage() {
               </motion.div>
             )}
 
-            <p className="text-xs font-black text-stone-500 uppercase tracking-widest border-b border-stone-800 pb-3">Dados do Responsável</p>
+            {!isUpgrade ? (
+              <>
+                <p className="text-xs font-black text-stone-500 uppercase tracking-widest border-b border-stone-800 pb-3">Dados do Responsável</p>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-bold text-stone-400 mb-1.5 ml-1">Nome Completo</label>
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-500" />
-                  <input type="text" required placeholder="Seu nome"
-                    className="w-full bg-stone-800/50 border border-stone-700/50 rounded-xl py-3 pl-10 pr-3 text-white text-sm placeholder-stone-600 focus:outline-none focus:ring-2 focus:ring-orange-500/50"
-                    value={formData.fullName} onChange={e => setFormData({ ...formData, fullName: e.target.value })} />
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-stone-400 mb-1.5 ml-1">Nome Completo</label>
+                    <div className="relative">
+                      <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-500" />
+                      <input type="text" required placeholder="Seu nome"
+                        className="w-full bg-stone-800/50 border border-stone-700/50 rounded-xl py-3 pl-10 pr-3 text-white text-sm placeholder-stone-600 focus:outline-none focus:ring-2 focus:ring-orange-500/50"
+                        value={formData.fullName} onChange={e => setFormData({ ...formData, fullName: e.target.value })} />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-stone-400 mb-1.5 ml-1">Nome da Loja</label>
+                    <div className="relative">
+                      <Store className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-500" />
+                      <input type="text" required placeholder="Creperia Gourmet"
+                        className="w-full bg-stone-800/50 border border-stone-700/50 rounded-xl py-3 pl-10 pr-3 text-white text-sm placeholder-stone-600 focus:outline-none focus:ring-2 focus:ring-orange-500/50"
+                        value={formData.storeName} onChange={e => setFormData({ ...formData, storeName: e.target.value })} />
+                    </div>
+                  </div>
                 </div>
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-stone-400 mb-1.5 ml-1">Nome da Loja</label>
-                <div className="relative">
-                  <Store className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-500" />
-                  <input type="text" required placeholder="Creperia Gourmet"
-                    className="w-full bg-stone-800/50 border border-stone-700/50 rounded-xl py-3 pl-10 pr-3 text-white text-sm placeholder-stone-600 focus:outline-none focus:ring-2 focus:ring-orange-500/50"
-                    value={formData.storeName} onChange={e => setFormData({ ...formData, storeName: e.target.value })} />
+
+                <div>
+                  <label className="block text-xs font-bold text-stone-400 mb-1.5 ml-1">E-mail</label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-500" />
+                    <input type="email" required placeholder="seu@email.com"
+                      className="w-full bg-stone-800/50 border border-stone-700/50 rounded-xl py-3 pl-10 pr-3 text-white text-sm placeholder-stone-600 focus:outline-none focus:ring-2 focus:ring-orange-500/50"
+                      value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} />
+                  </div>
                 </div>
-              </div>
-            </div>
 
-            <div>
-              <label className="block text-xs font-bold text-stone-400 mb-1.5 ml-1">E-mail</label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-500" />
-                <input type="email" required placeholder="seu@email.com"
-                  className="w-full bg-stone-800/50 border border-stone-700/50 rounded-xl py-3 pl-10 pr-3 text-white text-sm placeholder-stone-600 focus:outline-none focus:ring-2 focus:ring-orange-500/50"
-                  value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} />
+                <div>
+                  <label className="block text-xs font-bold text-stone-400 mb-1.5 ml-1">Senha</label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-500" />
+                    <input type="password" required placeholder="••••••••" minLength={6}
+                      className="w-full bg-stone-800/50 border border-stone-700/50 rounded-xl py-3 pl-10 pr-3 text-white text-sm placeholder-stone-600 focus:outline-none focus:ring-2 focus:ring-orange-500/50"
+                      value={formData.password} onChange={e => setFormData({ ...formData, password: e.target.value })} />
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="p-4 bg-orange-500/10 border border-orange-500/30 rounded-2xl flex items-center gap-3 text-orange-400 text-sm">
+                <Store className="w-5 h-5 flex-shrink-0" />
+                <span>O plano atual da loja <strong>{profile?.organizations?.name || profile?.organization_name || 'Autenticada'}</strong> será substituído.</span>
               </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-stone-400 mb-1.5 ml-1">Senha</label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-500" />
-                <input type="password" required placeholder="••••••••" minLength={6}
-                  className="w-full bg-stone-800/50 border border-stone-700/50 rounded-xl py-3 pl-10 pr-3 text-white text-sm placeholder-stone-600 focus:outline-none focus:ring-2 focus:ring-orange-500/50"
-                  value={formData.password} onChange={e => setFormData({ ...formData, password: e.target.value })} />
-              </div>
-            </div>
+            )}
 
             {/* Seção de pagamento */}
             <p className="text-xs font-black text-stone-500 uppercase tracking-widest border-b border-stone-800 pb-3 pt-2">
