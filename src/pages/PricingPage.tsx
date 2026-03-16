@@ -7,7 +7,7 @@ const plans = [
   {
     id: 'essencial',
     name: 'Essencial',
-    price: '99',
+    price: '50,00',
     description: 'Perfeito para creperias que estão começando.',
     features: [
       'Gestão de Pedidos (KDS)',
@@ -23,7 +23,7 @@ const plans = [
   {
     id: 'profissional',
     name: 'Profissional',
-    price: '189',
+    price: '100,00',
     description: 'Para quem quer crescer com agilidade e dados.',
     features: [
       'Tudo do Essencial',
@@ -36,23 +36,6 @@ const plans = [
     icon: <Rocket className="w-6 h-6 text-purple-500" />,
     popular: true,
     color: 'purple'
-  },
-  {
-    id: 'enterprise',
-    name: 'Enterprise',
-    price: '450',
-    description: 'Solução completa para grandes redes e franquias.',
-    features: [
-      'Tudo do Profissional',
-      'Múltiplas Unidades',
-      'API de Integração',
-      'Dashboards Customizados',
-      'Usuários Ilimitados',
-      'Gerente de Conta'
-    ],
-    icon: <Shield className="w-6 h-6 text-blue-500" />,
-    popular: false,
-    color: 'blue'
   }
 ];
 
@@ -94,7 +77,7 @@ export default function PricingPage() {
         </div>
 
         {/* Plans Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-16 max-w-4xl mx-auto">
           {plans.map((plan, index) => (
             <motion.div
               key={plan.name}

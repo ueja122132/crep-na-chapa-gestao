@@ -5,9 +5,8 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 
 const PLAN_INFO: Record<string, { label: string; color: string; icon: React.ReactNode; price: string }> = {
-  essencial: { label: 'Essencial', color: 'text-orange-400 border-orange-500/30 bg-orange-500/10', icon: <Zap className="w-4 h-4" />, price: '99' },
-  profissional: { label: 'Profissional', color: 'text-purple-400 border-purple-500/30 bg-purple-500/10', icon: <Rocket className="w-4 h-4" />, price: '189' },
-  enterprise: { label: 'Enterprise', color: 'text-blue-400 border-blue-500/30 bg-blue-500/10', icon: <Shield className="w-4 h-4" />, price: '450' },
+  essencial: { label: 'Essencial', color: 'text-orange-400 border-orange-500/30 bg-orange-500/10', icon: <Zap className="w-4 h-4" />, price: '50,00' },
+  profissional: { label: 'Profissional', color: 'text-purple-400 border-purple-500/30 bg-purple-500/10', icon: <Rocket className="w-4 h-4" />, price: '100,00' }
 };
 
 export default function RegisterPage() {
