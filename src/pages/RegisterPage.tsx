@@ -231,41 +231,45 @@ export default function RegisterPage() {
               </div>
             )}
 
-            {/* Seção de pagamento */}
-            <p className="text-xs font-black text-stone-500 uppercase tracking-widest border-b border-stone-800 pb-3 pt-2">
-              <CreditCard className="w-3.5 h-3.5 inline mr-1.5" />
-              Dados de Pagamento
-            </p>
-            <div className="p-4 bg-stone-800/30 border border-stone-700/30 rounded-2xl">
-              <p className="text-xs text-stone-400 mb-3">🔒 Ambiente seguro · Os primeiros 30 dias são grátis</p>
-              <div className="space-y-3">
-                <div>
-                  <input type="text" placeholder="Número do Cartão (ex: 4242 4242 4242 4242)"
-                    className="w-full bg-stone-800 border border-stone-700 rounded-xl py-2.5 px-3 text-white text-sm placeholder-stone-600 focus:outline-none focus:ring-2 focus:ring-orange-500/50"
-                    value={formData.cardNumber}
-                    onChange={e => setFormData({ ...formData, cardNumber: e.target.value })}
-                    maxLength={19} />
+            {!isUpgrade && (
+              <>
+                {/* Seção de pagamento */}
+                <p className="text-xs font-black text-stone-500 uppercase tracking-widest border-b border-stone-800 pb-3 pt-2">
+                  <CreditCard className="w-3.5 h-3.5 inline mr-1.5" />
+                  Dados de Pagamento
+                </p>
+                <div className="p-4 bg-stone-800/30 border border-stone-700/30 rounded-2xl">
+                  <p className="text-xs text-stone-400 mb-3">🔒 Ambiente seguro · Os primeiros 30 dias são grátis</p>
+                  <div className="space-y-3">
+                    <div>
+                      <input type="text" placeholder="Número do Cartão (ex: 4242 4242 4242 4242)"
+                        className="w-full bg-stone-800 border border-stone-700 rounded-xl py-2.5 px-3 text-white text-sm placeholder-stone-600 focus:outline-none focus:ring-2 focus:ring-orange-500/50"
+                        value={formData.cardNumber}
+                        onChange={e => setFormData({ ...formData, cardNumber: e.target.value })}
+                        maxLength={19} />
+                    </div>
+                    <div>
+                      <input type="text" placeholder="Nome no Cartão"
+                        className="w-full bg-stone-800 border border-stone-700 rounded-xl py-2.5 px-3 text-white text-sm placeholder-stone-600 focus:outline-none focus:ring-2 focus:ring-orange-500/50"
+                        value={formData.cardName}
+                        onChange={e => setFormData({ ...formData, cardName: e.target.value })} />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <input type="text" placeholder="Validade (MM/AA)"
+                        className="bg-stone-800 border border-stone-700 rounded-xl py-2.5 px-3 text-white text-sm placeholder-stone-600 focus:outline-none focus:ring-2 focus:ring-orange-500/50"
+                        value={formData.cardExpiry}
+                        onChange={e => setFormData({ ...formData, cardExpiry: e.target.value })}
+                        maxLength={5} />
+                      <input type="text" placeholder="CVV"
+                        className="bg-stone-800 border border-stone-700 rounded-xl py-2.5 px-3 text-white text-sm placeholder-stone-600 focus:outline-none focus:ring-2 focus:ring-orange-500/50"
+                        value={formData.cardCvv}
+                        onChange={e => setFormData({ ...formData, cardCvv: e.target.value })}
+                        maxLength={4} />
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <input type="text" placeholder="Nome no Cartão"
-                    className="w-full bg-stone-800 border border-stone-700 rounded-xl py-2.5 px-3 text-white text-sm placeholder-stone-600 focus:outline-none focus:ring-2 focus:ring-orange-500/50"
-                    value={formData.cardName}
-                    onChange={e => setFormData({ ...formData, cardName: e.target.value })} />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <input type="text" placeholder="Validade (MM/AA)"
-                    className="bg-stone-800 border border-stone-700 rounded-xl py-2.5 px-3 text-white text-sm placeholder-stone-600 focus:outline-none focus:ring-2 focus:ring-orange-500/50"
-                    value={formData.cardExpiry}
-                    onChange={e => setFormData({ ...formData, cardExpiry: e.target.value })}
-                    maxLength={5} />
-                  <input type="text" placeholder="CVV"
-                    className="bg-stone-800 border border-stone-700 rounded-xl py-2.5 px-3 text-white text-sm placeholder-stone-600 focus:outline-none focus:ring-2 focus:ring-orange-500/50"
-                    value={formData.cardCvv}
-                    onChange={e => setFormData({ ...formData, cardCvv: e.target.value })}
-                    maxLength={4} />
-                </div>
-              </div>
-            </div>
+              </>
+            )}
 
             <button type="submit" disabled={loading}
               className="w-full bg-gradient-to-r from-orange-500 to-amber-500 text-stone-900 font-bold py-4 rounded-2xl shadow-lg shadow-orange-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:hover:scale-100">
