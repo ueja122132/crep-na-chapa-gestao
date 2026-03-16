@@ -29,7 +29,8 @@ export default function SubscriptionWidget() {
   const isUpgradeAdmin = profile?.role === 'super_admin' || 
                          profile?.role === 'admin' || 
                          user?.email?.toLowerCase() === 'superadmin@gmail.com' ||
-                         (data?.owner_email && user?.email && data.owner_email.toLowerCase() === user.email.toLowerCase());
+                         (data?.owner_email && user?.email && data.owner_email.toLowerCase().trim() === user.email.toLowerCase().trim()) ||
+                         (!profile && user); // Fallback: se estiver logado mas sem perfil, permitir no painel de ajustes
   
   useEffect(() => {
     console.log('SubscriptionWidget Debug:', {
