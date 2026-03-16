@@ -63,75 +63,81 @@ const DashboardContent = () => {
                     (Array.isArray(profile?.organizations) ? profile?.organizations[0]?.name : profile?.organizations?.name) || 
                     'Sistema de Gestão';
 
+  const isSuperAdmin = profile?.role === 'super_admin';
+
   useEffect(() => {
-    document.title = `${storeName} | Painel`;
-  }, [storeName]);
+    if (isSuperAdmin && activeTab !== 'admin') {
+      setActiveTab('admin');
+    }
+  }, [isSuperAdmin]);
+
+  useEffect(() => {
+    document.title = isSuperAdmin ? 'SaaS Admin | Crep na Chapa' : `${storeName} | Painel`;
+  }, [storeName, isSuperAdmin]);
 
   return (
-    <div className="min-h-screen bg-stone-50 text-stone-900 font-sans">
+    <div className={`min-h-screen ${isSuperAdmin ? 'bg-stone-950 text-stone-100' : 'bg-stone-50 text-stone-900'} font-sans transition-colors duration-500`}>
       {/* Header */}
-      <header className="bg-white border-b border-stone-200 sticky top-0 z-50">
+      <header className={`${isSuperAdmin ? 'bg-stone-900 border-stone-800' : 'bg-white border-stone-200'} border-b sticky top-0 z-50 transition-colors duration-500`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center gap-3">
-              <div className="bg-orange-500 p-2 rounded-lg">
+              <div className={`${isSuperAdmin ? 'bg-orange-600' : 'bg-orange-500'} p-2 rounded-lg`}>
                 <UtensilsCrossed className="text-white w-6 h-6" />
               </div>
               <div>
-                <h1 className="text-lg font-bold tracking-tight text-stone-800 leading-none">
-                  {storeName}
+                <h1 className={`text-lg font-bold tracking-tight leading-none ${isSuperAdmin ? 'text-white' : 'text-stone-800'}`}>
+                  {isSuperAdmin ? 'SaaS Management' : storeName}
                 </h1>
-                <p className="text-[10px] text-stone-500 font-medium uppercase tracking-wider mt-0.5">
-                  Olá, administrador
+                <p className={`text-[10px] font-medium uppercase tracking-wider mt-0.5 ${isSuperAdmin ? 'text-stone-400' : 'text-stone-500'}`}>
+                  {isSuperAdmin ? 'Plataforma Global' : `Olá, ${profile?.full_name || 'administrador'}`}
                 </p>
               </div>
             </div>
             
             <div className="flex items-center gap-4">
-              <nav className="hidden md:flex space-x-1">
-                {profile?.role === 'super_admin' && (
+              {!isSuperAdmin && (
+                <nav className="hidden md:flex space-x-1">
                   <TabButton 
-                    active={activeTab === 'admin'} 
-                    onClick={() => setActiveTab('admin')}
-                    icon={<Shield className="w-4 h-4" />}
-                    label="Admin"
+                    active={activeTab === 'vendas'} 
+                    onClick={() => setActiveTab('vendas')}
+                    icon={<ShoppingBag className="w-4 h-4" />}
+                    label="Vendas"
                   />
-                )}
-                <TabButton 
-                  active={activeTab === 'vendas'} 
-                  onClick={() => setActiveTab('vendas')}
-                  icon={<ShoppingBag className="w-4 h-4" />}
-                  label="Vendas"
-                />
-                <TabButton 
-                  active={activeTab === 'cozinha'} 
-                  onClick={() => setActiveTab('cozinha')}
-                  icon={<ChefHat className="w-4 h-4" />}
-                  label="Cozinha"
-                />
-                <TabButton 
-                  active={activeTab === 'entrega'} 
-                  onClick={() => setActiveTab('entrega')}
-                  icon={<Package className="w-4 h-4" />}
-                  label="Entrega"
-                />
-                <TabButton 
-                  active={activeTab === 'cardapio'} 
-                  onClick={() => setActiveTab('cardapio')}
-                  icon={<ClipboardList className="w-4 h-4" />}
-                  label="Cardápio"
-                />
-                <TabButton 
-                  active={activeTab === 'financeiro'} 
-                  onClick={() => setActiveTab('financeiro')}
-                  icon={<BarChart3 className="w-4 h-4" />}
-                  label="Financeiro"
-                />
-              </nav>
+                  <TabButton 
+                    active={activeTab === 'cozinha'} 
+                    onClick={() => setActiveTab('cozinha')}
+                    icon={<ChefHat className="w-4 h-4" />}
+                    label="Cozinha"
+                  />
+                  <TabButton 
+                    active={activeTab === 'entrega'} 
+                    onClick={() => setActiveTab('entrega')}
+                    icon={<Package className="w-4 h-4" />}
+                    label="Entrega"
+                  />
+                  <TabButton 
+                    active={activeTab === 'cardapio'} 
+                    onClick={() => setActiveTab('cardapio')}
+                    icon={<ClipboardList className="w-4 h-4" />}
+                    label="Cardápio"
+                  />
+                  <TabButton 
+                    active={activeTab === 'financeiro'} 
+                    onClick={() => setActiveTab('financeiro')}
+                    icon={<BarChart3 className="w-4 h-4" />}
+                    label="Financeiro"
+                  />
+                </nav>
+              )}
 
               <button 
                 onClick={signOut}
-                className="p-2 text-stone-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                className={`p-2 rounded-xl transition-all ${
+                  isSuperAdmin 
+                    ? 'text-stone-400 hover:text-white hover:bg-stone-800' 
+                    : 'text-stone-400 hover:text-red-500 hover:bg-red-50'
+                }`}
                 title="Sair do Sistema"
               >
                 <LogOut className="w-5 h-5" />
@@ -141,7 +147,6 @@ const DashboardContent = () => {
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <AnimatePresence mode="wait">
           <motion.div
@@ -151,50 +156,59 @@ const DashboardContent = () => {
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.2 }}
           >
-            {activeTab === 'vendas' && <OrderTerminal />}
-            {activeTab === 'cozinha' && <KitchenDisplay />}
-            {activeTab === 'entrega' && <DeliveryScreen />}
-            {activeTab === 'cardapio' && <MenuManager />}
-            {activeTab === 'financeiro' && <FinancialDashboard />}
-            {activeTab === 'admin' && profile?.role === 'super_admin' && <SuperAdminPage />}
+            {isSuperAdmin ? (
+              <SuperAdminPage />
+            ) : (
+              <>
+                {activeTab === 'vendas' && <OrderTerminal />}
+                {activeTab === 'cozinha' && <KitchenDisplay />}
+                {activeTab === 'entrega' && <DeliveryScreen />}
+                {activeTab === 'cardapio' && <MenuManager />}
+                {activeTab === 'financeiro' && <FinancialDashboard />}
+              </>
+            )}
           </motion.div>
         </AnimatePresence>
       </main>
 
-      {/* Mobile Navigation */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-stone-200 flex justify-around py-3 px-2 z-50">
-        <MobileTabButton 
-          active={activeTab === 'vendas'} 
-          onClick={() => setActiveTab('vendas')}
-          icon={<ShoppingBag className="w-6 h-6" />}
-          label="Vendas"
-        />
-        <MobileTabButton 
-          active={activeTab === 'cozinha'} 
-          onClick={() => setActiveTab('cozinha')}
-          icon={<ChefHat className="w-6 h-6" />}
-          label="Cozinha"
-        />
-        <MobileTabButton 
-          active={activeTab === 'entrega'} 
-          onClick={() => setActiveTab('entrega')}
-          icon={<Package className="w-6 h-6" />}
-          label="Entrega"
-        />
-        <MobileTabButton 
-          active={activeTab === 'cardapio'} 
-          onClick={() => setActiveTab('cardapio')}
-          icon={<ClipboardList className="w-6 h-6" />}
-          label="Cardápio"
-        />
-        <MobileTabButton 
-          active={activeTab === 'financeiro'} 
-          onClick={() => setActiveTab('financeiro')}
-          icon={<BarChart3 className="w-6 h-6" />}
-          label="Financeiro"
-        />
-      </nav>
-      <div className="h-20 md:hidden"></div>
+      {!isSuperAdmin && (
+        <>
+          {/* Mobile Navigation */}
+          <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-stone-200 flex justify-around py-3 px-2 z-50">
+            <MobileTabButton 
+              active={activeTab === 'vendas'} 
+              onClick={() => setActiveTab('vendas')}
+              icon={<ShoppingBag className="w-6 h-6" />}
+              label="Vendas"
+            />
+            <MobileTabButton 
+              active={activeTab === 'cozinha'} 
+              onClick={() => setActiveTab('cozinha')}
+              icon={<ChefHat className="w-6 h-6" />}
+              label="Cozinha"
+            />
+            <MobileTabButton 
+              active={activeTab === 'entrega'} 
+              onClick={() => setActiveTab('entrega')}
+              icon={<Package className="w-6 h-6" />}
+              label="Entrega"
+            />
+            <MobileTabButton 
+              active={activeTab === 'cardapio'} 
+              onClick={() => setActiveTab('cardapio')}
+              icon={<ClipboardList className="w-6 h-6" />}
+              label="Cardápio"
+            />
+            <MobileTabButton 
+              active={activeTab === 'financeiro'} 
+              onClick={() => setActiveTab('financeiro')}
+              icon={<BarChart3 className="w-6 h-6" />}
+              label="Financeiro"
+            />
+          </nav>
+          <div className="h-20 md:hidden"></div>
+        </>
+      )}
     </div>
   );
 };
