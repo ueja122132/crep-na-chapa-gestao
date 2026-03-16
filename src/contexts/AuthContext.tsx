@@ -24,10 +24,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const initialized = React.useRef(false);
+
   useEffect(() => {
+    if (initialized.current) return;
+    initialized.current = true;
+
+    console.log('AuthContext: Initializing session...');
+    
     // Get initial session
     supabase.auth.getSession()
       .then(({ data: { session } }) => {
+        console.log('AuthContext: Session retrieved:', !!session);
         setSession(session);
         setUser(session?.user ?? null);
         if (session?.user) {
@@ -37,12 +45,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       })
       .catch(err => {
-        console.error('Error getting session:', err);
+        if (err.name !== 'AbortError') {
+          console.error('AuthContext: Error getting session:', err);
+        }
         setLoading(false);
       });
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      console.log('AuthContext: Auth state change:', _event);
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {

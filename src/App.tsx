@@ -31,6 +31,8 @@ const AppContent = () => {
   const { session, loading, signOut } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>('vendas');
 
+  console.log('AppContent render:', { loading, session: !!session });
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#1c1917] flex items-center justify-center">
