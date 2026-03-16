@@ -12,6 +12,7 @@ interface SubscriptionData {
   payment_status: string;
   subscription_expires_at: string | null;
   created_at: string;
+  owner_email?: string;
 }
 
 const PLAN_DISPLAY: Record<string, { label: string; icon: React.ReactNode; color: string; price: number }> = {
@@ -22,9 +23,23 @@ const PLAN_DISPLAY: Record<string, { label: string; icon: React.ReactNode; color
 };
 
 export default function SubscriptionWidget() {
-  const { session, profile } = useAuth();
-  const isUpgradeAdmin = profile?.role === 'super_admin' || profile?.role === 'admin';
+  const { session, user, profile } = useAuth();
   const [data, setData] = useState<SubscriptionData | null>(null);
+  
+  const isUpgradeAdmin = profile?.role === 'super_admin' || 
+                         profile?.role === 'admin' || 
+                         user?.email?.toLowerCase() === 'superadmin@gmail.com' ||
+                         (data?.owner_email && user?.email && data.owner_email.toLowerCase() === user.email.toLowerCase());
+  
+  useEffect(() => {
+    console.log('SubscriptionWidget Debug:', {
+      hasProfile: !!profile,
+      role: profile?.role,
+      userEmail: user?.email,
+      ownerEmail: data?.owner_email,
+      isUpgradeAdmin
+    });
+  }, [profile, user, data, isUpgradeAdmin]);
   const [loading, setLoading] = useState(true);
   const [showPixPay, setShowPixPay] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
