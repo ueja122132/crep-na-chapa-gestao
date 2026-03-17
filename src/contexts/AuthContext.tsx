@@ -2,17 +2,15 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { Session, User } from '@supabase/supabase-js';
 
-interface UserProfile {
+export interface UserProfile {
   id: string;
-  org_id: string;
-  organization_id?: string; // Virtual para compatibilidade
-  full_name: string | null;
-  name?: string | null; // Real campo do banco
-  organization_name?: string; // Virtual
-  organizations?: {
-    name: string;
-  } | { name: string }[];
-  role?: string;
+  email: string;
+  name?: string;
+  role: 'admin' | 'staff' | 'superadmin' | 'global_admin';
+  organization_id?: string;
+  organization_name?: string;
+  avatar_url?: string;
+  status?: string;
 }
 
 interface AuthContextType {
@@ -38,26 +36,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.warn('AuthContext: Loading fail-safe triggered (timeout)');
         setLoading(false);
       }
-    }, 3000); // Reduzido para 3 segundos para melhor percepção de velocidade
+    }, 5000); 
     return () => clearTimeout(timer);
   }, [loading]);
 
-  const initialized = React.useRef(false);
-
   useEffect(() => {
-    if (initialized.current) return;
-    initialized.current = true;
-
     console.log('AuthContext: Initializing auth listener...');
     
-    // Listen for auth changes - This also triggers for the initial session
+    // Check current session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        fetchProfile(session.user.id, session.user.email);
+      } else {
+        setLoading(false);
+      }
+    });
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       console.log('AuthContext: Auth state change:', _event);
       setSession(session);
       setUser(session?.user ?? null);
       
       if (session?.user) {
-        await fetchProfile(session.user.id);
+        await fetchProfile(session.user.id, session.user.email);
       } else {
         setProfile(null);
         setLoading(false);
@@ -71,67 +74,64 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const fetchProfileInProgress = React.useRef<string | null>(null);
 
-  const fetchProfile = async (userId: string) => {
+  const fetchProfile = async (userId: string, userEmail: string | undefined) => {
     if (fetchProfileInProgress.current === userId) return;
     fetchProfileInProgress.current = userId;
 
     console.log('AuthContext: Fetching profile for:', userId);
     try {
-      const { data, error } = await supabase
-        .from('profiles')
+      const { data: profileData, error: profileError } = await supabase
+        .from('user_profiles')
         .select('*, organizations(name)')
         .eq('id', userId)
         .single();
 
-      if (error) {
-        if (error.code === 'PGRST116') {
-          console.log('AuthContext: No profile found for user (new user)');
-        } else {
-          console.error('AuthContext: Error fetching profile:', error);
-        }
+      if (profileError) {
+        console.error('AuthContext: Error fetching profile:', profileError);
+        const basicProfile: UserProfile = {
+          id: userId,
+          email: userEmail || '',
+          role: 'admin',
+        };
+        setProfile(basicProfile);
       } else {
-        if (data) {
-          // Mapeia os nomes reais para os nomes esperados pelo resto da aplicação
-          data.organization_id = data.org_id;
-          data.full_name = data.name;
-
-          // Garantir que organizations.name seja acessível mesmo se retornar como array
-          if (data.organizations && Array.isArray(data.organizations)) {
-            data.organization_name = data.organizations[0]?.name;
-          } else if (data.organizations) {
-            data.organization_name = (data.organizations as any).name;
-          }
-
-          // Blindagem contra nomes incorretos ou obsoletos
-          if (data.org_id === '9b1462c0-d902-4fdc-9542-7a92f6c28402' || data.org_id === 'ba2087fe-0498-43f4-93dc-bdf9f2f1ce66') {
-             data.organization_name = 'tem de tudo';
-          }
-
-          setProfile(data);
+        // Map to standard object
+        let orgName = '';
+        if (profileData.organizations) {
+            orgName = Array.isArray(profileData.organizations) 
+                ? profileData.organizations[0]?.name 
+                : (profileData.organizations as any).name;
         }
+
+        // Hardcoded fixes for known IDs if necessary
+        if (profileData.organization_id === '9b1462c0-d902-4fdc-9542-7a92f6c28402' || profileData.organization_id === 'ba2087fe-0498-43f4-93dc-bdf9f2f1ce66') {
+             orgName = 'tem de tudo';
+        }
+
+        const fullProfile: UserProfile = {
+          ...profileData,
+          organization_name: orgName,
+          name: profileData.name || profileData.full_name,
+          email: userEmail || profileData.email,
+          role: profileData.role || 'admin'
+        };
+        setProfile(fullProfile);
       }
     } catch (err: any) {
-      if (err.name !== 'AbortError') {
-        console.error('AuthContext: Exception in fetchProfile:', err);
-      }
+      console.error('AuthContext: Exception in fetchProfile:', err);
     } finally {
       fetchProfileInProgress.current = null;
-      console.log('AuthContext: Setting loading to false');
       setLoading(false);
     }
   };
 
   const signOut = async () => {
-    console.log('AuthContext: Signing out...');
     try {
-      // Limpeza imediata do estado local
       setSession(null);
       setUser(null);
       setProfile(null);
       setLoading(false);
       
-      // Limpeza física do localStorage para evitar restauração automática pelo Supabase Auth
-      // O Supabase usa chaves como 'sb-djzccjezfnxmxvrhhzvb-auth-token'
       Object.keys(localStorage).forEach(key => {
         if (key.includes('sb-') && key.includes('-auth-token')) {
           localStorage.removeItem(key);
@@ -139,12 +139,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
       
       await supabase.auth.signOut();
-      
-      // Forçar redirecionamento e recarregamento para limpar cache do navegador
       window.location.href = '/login';
     } catch (error) {
       console.error('Error during sign out:', error);
-      // Fallback em caso de erro no signOut do Supabase
       window.location.href = '/login';
     }
   };

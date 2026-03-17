@@ -36,10 +36,10 @@ async function getOrganizationFromAuth(authHeader: string | undefined) {
 
     console.log(`[AUTH] Usuário validado: ${user.email} (${user.id}). Buscando perfil...`);
 
-    // 2. Get org_id from profile
+    // 2. Get organization_id from user_profiles
     const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('org_id')
+      .from('user_profiles')
+      .select('organization_id')
       .eq('id', user.id)
       .single();
 
@@ -68,8 +68,8 @@ async function getOrganizationFromAuth(authHeader: string | undefined) {
       throw new Error('Organization context not found.');
     }
 
-    console.log(`[AUTH] Organização identificada: ${profile.org_id}`);
-    return profile.org_id;
+    console.log(`[AUTH] Organização identificada: ${profile.organization_id}`);
+    return profile.organization_id;
   } catch (err: any) {
     console.error('[AUTH] ERRO FATAL:', err.message);
     throw err;
@@ -543,7 +543,7 @@ async function startServer() {
         .from('organizations')
         .select(`
           *,
-          profiles:profiles!inner(email, name)
+          user_profiles!inner(email, name)
         `)
         .order('created_at', { ascending: false });
       
@@ -560,7 +560,7 @@ async function startServer() {
       // 3. Map orders to organizations and flatten owner info
       const mappedOrgs = orgs.map((org: any) => {
         const orgOrders = orderStats.filter(o => o.organization_id === org.id);
-        const ownerProfile = Array.isArray(org.profiles) ? org.profiles[0] : org.profiles;
+        const ownerProfile = Array.isArray(org.user_profiles) ? org.user_profiles[0] : org.user_profiles;
         
         return {
           ...org,
@@ -642,7 +642,7 @@ async function startServer() {
       const orgId = await getOrganizationFromAuth(req.headers.authorization);
       const { data, error } = await supabase
         .from('organizations')
-        .select('id, name, plan, status, subscription_status, next_billing_date, created_at')
+        .select('id, name, plan, status, payment_status, subscription_expires_at, created_at')
         .eq('id', orgId)
         .single();
       if (error) throw error;
@@ -681,8 +681,8 @@ async function startServer() {
         .from('organizations')
         .update({ 
           plan: planId, 
-          subscription_status: 'past_due', // Marcando como pendente de pagamento
-          next_billing_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+          payment_status: 'pending',
+          subscription_expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
         })
         .eq('id', orgId)
         .select()
@@ -711,9 +711,9 @@ async function startServer() {
       const { payment_status, subscription_expires_at } = req.body;
       const updates: any = {};
       
-      // Mapeamento de campos para o novo esquema
-      if (payment_status) updates.subscription_status = payment_status; // 'paid', 'past_due', etc.
-      if (subscription_expires_at) updates.next_billing_date = subscription_expires_at;
+      // Mapeamento de campos (Rollback para esquema legado)
+      if (payment_status) updates.payment_status = payment_status; // 'paid', 'pending', etc.
+      if (subscription_expires_at) updates.subscription_expires_at = subscription_expires_at;
       
       // If confirming payment, also set status to active
       if (payment_status === 'paid') updates.status = 'active';
