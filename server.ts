@@ -710,24 +710,18 @@ async function startServer() {
         }
       }
 
-      // Estratégia 3: Se for superadmin, pegar a organização pela slug 'tem-de-tudo'
+      // Estratégia 3: Sistema single-store — pegar a única organização disponível
       if (!orgId) {
-        const { data: profile } = await supabase
-          .from('user_profiles')
-          .select('role')
-          .eq('id', user.id)
+        console.log(`[UPGRADE-PLAN] Estratégia 3: pegando org disponível no sistema...`);
+        const { data: mainOrg } = await supabase
+          .from('organizations')
+          .select('id, name')
+          .eq('status', 'active')
+          .limit(1)
           .maybeSingle();
-        
-        if (profile?.role === 'super_admin' || profile?.role === 'admin') {
-          const { data: mainOrg } = await supabase
-            .from('organizations')
-            .select('id')
-            .limit(1)
-            .maybeSingle();
-          if (mainOrg?.id) {
-            orgId = mainOrg.id;
-            console.log(`[UPGRADE-PLAN] Estratégia 3 (admin/única org): ${orgId}`);
-          }
+        if (mainOrg?.id) {
+          orgId = mainOrg.id;
+          console.log(`[UPGRADE-PLAN] Estratégia 3 (primeira org ativa): ${orgId} (${mainOrg.name})`);
         }
       }
 
