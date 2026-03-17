@@ -81,78 +81,46 @@ export default function RegisterPage() {
 
     try {
       if (isUpgrade) {
-        let orgIdToUpdate = urlOrgId;
+        // --- UPGRADE DIRETO NO SUPABASE (sem servidor) ---
+        let orgIdToUpdate: string | null = urlOrgId || profile?.organization_id || null;
+
+        // Se não temos o ID ainda, buscar via owner_id na tabela organizations
         if (!orgIdToUpdate && session?.user?.id) {
-          // 1. Tentar encontrar a organização do usuário logado através de user_profiles
-          const { data: profileData, error: profileError } = await supabase
-            .from('user_profiles')
-            .select('organization_id')
-            .eq('id', session.user.id)
-            .single();
-
-          if (profileError) {
-            console.warn('Erro ao buscar organization_id no user_profiles:', profileError.message);
-          } else if (profileData?.organization_id) {
-            orgIdToUpdate = profileData.organization_id;
-          } else {
-            // Fallback para buscar em organizations se não encontrado em user_profiles
-            try {
-              const { data: ownedOrg } = await Promise.race([
-                supabase.from('organizations').select('id').eq('owner_id', session.user.id).limit(1).maybeSingle(),
-                new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 8000))
-              ]) as any;
-              if (ownedOrg) orgIdToUpdate = ownedOrg.id;
-            } catch (e) { console.warn('Busca de OrgId falhou ou deu timeout'); }
-          }
-        }
-
-        if (orgIdToUpdate) {
-          console.log('[UPGRADE] OrgID encontrada no perfil:', orgIdToUpdate);
-          const controller = new AbortController();
-          const fetchTimeout = setTimeout(() => controller.abort(), 15000);
-          
-          const response = await fetch('/api/subscription/change-plan', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${session?.access_token}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ planId }),
-            signal: controller.signal
-          });
-          
-          clearTimeout(fetchTimeout);
-          if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(errorText || `Erro no servidor (${response.status})`);
-          }
-          
-          clearTimeout(watchdog);
-          setSuccess(true);
-          setTimeout(() => navigate('/vendas'), 2500);
-          return;
-        } else {
-          // Fallback para criação se orgId não encontrado no modo upgrade
-          if (!formData.storeName) throw new Error('Informe o nome da sua loja.');
-          const slug = formData.storeName.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^\w-]/g, '');
-          const nextBillingDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days from now
-          const { error: upgradeError } = await supabase
+          console.log('[UPGRADE] Buscando organização via owner_id...');
+          const { data: ownedOrg } = await supabase
             .from('organizations')
-            .update({ 
-              plan: planId, 
-              payment_status: 'pending',
-              subscription_expires_at: nextBillingDate.toISOString()
-            })
-            .eq('id', orgIdToUpdate);
-          if (upgradeError) throw upgradeError;
-          clearTimeout(watchdog);
-          setSuccess(true);
-          setTimeout(() => navigate('/vendas'), 2500);
-          return;
+            .select('id')
+            .eq('owner_id', session.user.id)
+            .limit(1)
+            .maybeSingle();
+          if (ownedOrg?.id) orgIdToUpdate = ownedOrg.id;
         }
+
+        if (!orgIdToUpdate) {
+          throw new Error('Não foi possível identificar sua loja. Entre em contato com o suporte.');
+        }
+
+        console.log('[UPGRADE] Atualizando para plano:', planId, 'org:', orgIdToUpdate);
+        const { error: upgradeError } = await supabase
+          .from('organizations')
+          .update({
+            plan: planId,
+            payment_status: 'pending',
+            subscription_expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+            status: 'active'
+          })
+          .eq('id', orgIdToUpdate);
+
+        if (upgradeError) throw new Error(upgradeError.message);
+
+        console.log('[UPGRADE] Sucesso!');
+        clearTimeout(watchdog);
+        setSuccess(true);
+        setTimeout(() => navigate('/vendas'), 2500);
+        return;
       }
 
-      // Registro Normal
+      // Registro Normal (novo usuário)
       const { data: authData, error: authErr } = await supabase.auth.signUp({ email: formData.email, password: formData.password });
       if (authErr) throw authErr;
       if (!authData.user) throw new Error('Não foi possível criar o usuário.');
@@ -163,16 +131,16 @@ export default function RegisterPage() {
         slug, 
         plan: planId, 
         status: 'active', 
-        subscription_status: 'past_due',
-        next_billing_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        payment_status: 'pending',
+        subscription_expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
         owner_id: authData.user.id
       }]).select().single();
       if (orgErr) throw orgErr;
 
-      const { error: profErr } = await supabase.from('profiles').insert([{
-        id: authData.user.id, org_id: orgData.id, name: formData.fullName, role: 'admin'
+      const { error: profErr } = await supabase.from('user_profiles').insert([{
+        id: authData.user.id, organization_id: orgData.id, name: formData.fullName, role: 'admin'
       }]);
-      if (profErr) throw profErr;
+      if (profErr) console.warn('Erro ao criar perfil (não crítico):', profErr.message);
 
       clearTimeout(watchdog);
       setSuccess(true);
