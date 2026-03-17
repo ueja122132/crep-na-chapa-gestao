@@ -29,138 +29,125 @@ export default function RegisterPage() {
     email: '',
     password: '',
     storeName: urlStoreName || '',
-    cardNumber: '',
-    cardName: '',
-    cardExpiry: '',
-    cardCvv: '',
   });
 
   useEffect(() => {
-    async function loadOrgName() {
-      if (urlStoreName && urlStoreName !== 'Loja') {
-        setFormData(prev => ({ ...prev, storeName: urlStoreName }));
-        return;
-      }
-      if (isUpgrade && session?.user?.email) {
-        const profileName = profile?.organization_name || (profile?.organizations as any)?.name;
-        if (profileName && profileName !== 'Autenticada') {
-          setFormData(prev => ({ ...prev, storeName: profileName }));
-          return;
-        }
-        const { data: org } = await supabase
-          .from('organizations')
-          .select('name')
-          .eq('owner_id', session.user.id)
-          .limit(1)
-          .single();
-        if (org?.name) {
-          const finalName = (org.name === 'Loja' || org.name === 'Crep na Chapa') ? 'tem de tudo' : org.name;
-          setFormData(prev => ({ ...prev, storeName: finalName }));
-        }
-      }
+    if (urlStoreName) {
+      setFormData(prev => ({ ...prev, storeName: urlStoreName }));
+      return;
     }
-    loadOrgName();
-  }, [isUpgrade, profile, session, urlStoreName]);
+    if (isUpgrade && profile?.organization_name) {
+      setFormData(prev => ({ ...prev, storeName: profile.organization_name || '' }));
+    }
+  }, [isUpgrade, profile, urlStoreName]);
 
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // =============================================
+  // UPGRADE: Chama o servidor com service role
+  // =============================================
+  const handleUpgrade = async () => {
     setLoading(true);
     setError(null);
-    console.log('[REGISTRO] Iniciando...');
 
-    const watchdog = setTimeout(() => {
-      setLoading(prev => {
-        if (prev) {
-          setError('O servidor demorou muito a responder. Verifique sua conexão e tente novamente.');
-          return false;
-        }
-        return prev;
-      });
-    }, 20000);
+    const token = session?.access_token;
+    if (!token) {
+      setError('Sessão expirada. Faça login novamente.');
+      setLoading(false);
+      return;
+    }
 
     try {
-      if (isUpgrade) {
-        // --- UPGRADE DIRETO NO SUPABASE (sem servidor) ---
-        let orgIdToUpdate: string | null = urlOrgId || profile?.organization_id || null;
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 15000);
 
-        // Buscar organização pelo email do usuário logado (campo real: owner_email)
-        if (!orgIdToUpdate && session?.user?.email) {
-          console.log('[UPGRADE] Buscando org via owner_email:', session.user.email);
-          const { data: ownedOrg } = await supabase
-            .from('organizations')
-            .select('id')
-            .eq('owner_email', session.user.email)
-            .limit(1)
-            .maybeSingle();
-          if (ownedOrg?.id) orgIdToUpdate = ownedOrg.id;
-        }
+      const res = await fetch('/api/upgrade-plan', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ planId }),
+        signal: controller.signal
+      });
 
-        // Fallback: buscar via user_profiles.organization_id
-        if (!orgIdToUpdate && session?.user?.id) {
-          console.log('[UPGRADE] Fallback: buscando org via user_profiles...');
-          const { data: up } = await supabase
-            .from('user_profiles')
-            .select('organization_id')
-            .eq('id', session.user.id)
-            .maybeSingle();
-          if (up?.organization_id) orgIdToUpdate = up.organization_id;
-        }
+      clearTimeout(timer);
 
-        if (!orgIdToUpdate) {
-          throw new Error('Não foi possível identificar sua loja. Entre em contato com o suporte.');
-        }
-
-        console.log('[UPGRADE] Atualizando para plano:', planId, '| Org:', orgIdToUpdate);
-        const { error: upgradeError } = await supabase
-          .from('organizations')
-          .update({
-            plan: planId,
-            payment_status: 'pending',
-            subscription_expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-            status: 'active'
-          })
-          .eq('id', orgIdToUpdate);
-
-        if (upgradeError) throw new Error(upgradeError.message);
-
-        console.log('[UPGRADE] Sucesso!');
-        clearTimeout(watchdog);
-        setSuccess(true);
-        setTimeout(() => navigate('/vendas'), 2500);
-        return;
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ error: `Erro ${res.status}` }));
+        throw new Error(body.error || `Erro ${res.status}`);
       }
 
-      // Registro Normal (novo usuário)
-      const { data: authData, error: authErr } = await supabase.auth.signUp({ email: formData.email, password: formData.password });
-      if (authErr) throw authErr;
-      if (!authData.user) throw new Error('Não foi possível criar o usuário.');
-
-      const slug = formData.storeName.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^\w-]/g, '');
-      const { data: orgData, error: orgErr } = await supabase.from('organizations').insert([{
-        name: formData.storeName, 
-        slug, 
-        plan: planId, 
-        status: 'active', 
-        payment_status: 'pending',
-        subscription_expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-        owner_id: authData.user.id
-      }]).select().single();
-      if (orgErr) throw orgErr;
-
-      const { error: profErr } = await supabase.from('user_profiles').insert([{
-        id: authData.user.id, organization_id: orgData.id, name: formData.fullName, role: 'admin'
-      }]);
-      if (profErr) console.warn('Erro ao criar perfil (não crítico):', profErr.message);
-
-      clearTimeout(watchdog);
+      const data = await res.json();
+      console.log('[UPGRADE] Sucesso!', data);
       setSuccess(true);
       setTimeout(() => navigate('/vendas'), 2500);
     } catch (err: any) {
-      clearTimeout(watchdog);
-      console.error('[REGISTRO] Erro:', err);
-      setError(err.message || 'Ocorreu um erro. Tente novamente.');
-    } finally {
+      if (err.name === 'AbortError') {
+        setError('Tempo limite atingido. Verifique sua conexão e tente novamente.');
+      } else {
+        setError(err.message || 'Ocorreu um erro inesperado.');
+      }
       setLoading(false);
+    }
+  };
+
+  // =============================================
+  // REGISTRO NORMAL: Novo usuário
+  // =============================================
+  const handleNewUser = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      // 1. Criar conta de autenticação
+      const { data: authData, error: authErr } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.password
+      });
+      if (authErr) throw authErr;
+      if (!authData.user) throw new Error('Não foi possível criar o usuário.');
+
+      // 2. Criar organização
+      const slug = formData.storeName.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^\w-]/g, '');
+      const { data: orgData, error: orgErr } = await supabase
+        .from('organizations')
+        .insert([{
+          name: formData.storeName,
+          slug,
+          plan: planId,
+          status: 'active',
+          payment_status: 'pending',
+          subscription_expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+          owner_email: formData.email,
+          owner_name: formData.fullName,
+        }])
+        .select()
+        .single();
+      if (orgErr) throw orgErr;
+
+      // 3. Criar perfil do usuário
+      await supabase.from('user_profiles').insert([{
+        id: authData.user.id,
+        organization_id: orgData.id,
+        full_name: formData.fullName,
+        role: 'admin'
+      }]).then(({ error: profErr }) => {
+        if (profErr) console.warn('Aviso: perfil não criado:', profErr.message);
+      });
+
+      setSuccess(true);
+      setTimeout(() => navigate('/vendas'), 2500);
+    } catch (err: any) {
+      setError(err.message || 'Ocorreu um erro. Tente novamente.');
+      setLoading(false);
+    }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isUpgrade) {
+      handleUpgrade();
+    } else {
+      handleNewUser();
     }
   };
 
@@ -172,7 +159,7 @@ export default function RegisterPage() {
             <CheckCircle2 className="w-10 h-10 text-green-500" />
           </div>
           <h2 className="text-2xl font-bold text-white mb-2">{isUpgrade ? 'Plano Alterado!' : 'Loja criada com sucesso!'}</h2>
-          <p className="text-stone-400 mb-2">Plano <span className="font-bold text-white">{planName}</span> finalizado.</p>
+          <p className="text-stone-400 mb-2">Plano <span className="font-bold text-white">{planName}</span> ativado.</p>
           <p className="text-stone-500 text-sm">Redirecionando...</p>
         </motion.div>
       </div>
@@ -202,28 +189,26 @@ export default function RegisterPage() {
                 <p className="text-xs opacity-80">R$ {searchParams.get('price') || '50,00'}/mês · Pagamento pendente no PIX</p>
               </div>
             </div>
-            { !isUpgrade && <button onClick={() => navigate('/planos')} className="text-xs underline opacity-50 hover:opacity-100">Trocar</button>}
-            { isUpgrade && <button onClick={() => navigate(-1)} className="text-xs underline opacity-50 hover:opacity-100">Trocar</button>}
+            {isUpgrade && <button onClick={() => navigate(-1)} className="text-xs underline opacity-50 hover:opacity-100">Trocar</button>}
+            {!isUpgrade && <button onClick={() => navigate('/planos')} className="text-xs underline opacity-50 hover:opacity-100">Trocar</button>}
           </div>
         </div>
 
-        <form onSubmit={handleRegister} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4">
           {isUpgrade ? (
-            <div className="space-y-4">
-              <div className="relative group">
-                <label className="text-xs font-medium text-stone-500 ml-1 mb-1 block">Nome da Loja</label>
-                <div className="absolute inset-y-[34px] left-4 flex items-center pointer-events-none group-focus-within:text-orange-500 transition-colors">
-                  <Store className="w-5 h-5" />
-                </div>
-                <input
-                  type="text"
-                  required
-                  value={formData.storeName}
-                  onChange={(e) => setFormData({ ...formData, storeName: e.target.value })}
-                  className="w-full bg-stone-900 border border-white/10 rounded-2xl py-3.5 pl-12 pr-4 text-white placeholder:text-stone-600 focus:border-orange-500/50 focus:ring-2 focus:ring-orange-500/20 transition-all outline-none"
-                  placeholder="Nome da sua loja"
-                />
+            <div className="relative group">
+              <label className="text-xs font-medium text-stone-500 ml-1 mb-1 block">Nome da Loja</label>
+              <div className="absolute inset-y-[34px] left-4 flex items-center pointer-events-none group-focus-within:text-orange-500 transition-colors">
+                <Store className="w-5 h-5" />
               </div>
+              <input
+                type="text"
+                required
+                value={formData.storeName}
+                onChange={(e) => setFormData({ ...formData, storeName: e.target.value })}
+                className="w-full bg-stone-900 border border-white/10 rounded-2xl py-3.5 pl-12 pr-4 text-white placeholder:text-stone-600 focus:border-orange-500/50 focus:ring-2 focus:ring-orange-500/20 transition-all outline-none"
+                placeholder="Nome da sua loja"
+              />
             </div>
           ) : (
             <>
@@ -232,6 +217,12 @@ export default function RegisterPage() {
                   <User className="w-5 h-5" />
                 </div>
                 <input type="text" required value={formData.fullName} onChange={(e) => setFormData({ ...formData, fullName: e.target.value })} className="w-full bg-stone-900 border border-white/10 rounded-2xl py-3.5 pl-12 pr-4 text-white placeholder:text-stone-600 focus:border-orange-500/50 focus:ring-2 focus:ring-orange-500/20 transition-all outline-none" placeholder="Nome Completo" />
+              </div>
+              <div className="relative group">
+                <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none group-focus-within:text-orange-500 transition-colors">
+                  <Store className="w-5 h-5" />
+                </div>
+                <input type="text" required value={formData.storeName} onChange={(e) => setFormData({ ...formData, storeName: e.target.value })} className="w-full bg-stone-900 border border-white/10 rounded-2xl py-3.5 pl-12 pr-4 text-white placeholder:text-stone-600 focus:border-orange-500/50 focus:ring-2 focus:ring-orange-500/20 transition-all outline-none" placeholder="Nome da Loja" />
               </div>
               <div className="relative group">
                 <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none group-focus-within:text-orange-500 transition-colors">

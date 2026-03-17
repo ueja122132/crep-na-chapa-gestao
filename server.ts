@@ -652,6 +652,95 @@ async function startServer() {
     }
   });
 
+  // =============================================
+  // NOVO ENDPOINT: Upgrade de Plano (Simplificado)
+  // Usa owner_email da org para localizar sem depender de user_profiles
+  // =============================================
+  app.post("/api/upgrade-plan", async (req, res) => {
+    console.log('[UPGRADE-PLAN] Requisição recebida');
+    const timeout = setTimeout(() => {
+      if (!res.headersSent) res.status(504).json({ error: 'Timeout no servidor' });
+    }, 10000);
+
+    try {
+      const authHeader = req.headers.authorization;
+      if (!authHeader?.startsWith('Bearer ')) {
+        clearTimeout(timeout);
+        return res.status(401).json({ error: 'Token não fornecido' });
+      }
+
+      // 1. Validar token e obter email do usuário
+      const token = authHeader.split(' ')[1];
+      const { data: { user }, error: authErr } = await supabase.auth.getUser(token);
+      if (authErr || !user?.email) {
+        clearTimeout(timeout);
+        return res.status(401).json({ error: 'Token inválido' });
+      }
+
+      const { planId } = req.body;
+      if (!planId) {
+        clearTimeout(timeout);
+        return res.status(400).json({ error: 'planId é obrigatório' });
+      }
+
+      console.log(`[UPGRADE-PLAN] User: ${user.email} | Plano: ${planId}`);
+
+      // 2. Buscar organização pelo email do dono (owner_email)
+      const { data: org, error: orgErr } = await supabase
+        .from('organizations')
+        .select('id, name, plan')
+        .eq('owner_email', user.email)
+        .limit(1)
+        .maybeSingle();
+
+      // Fallback: se owner_email não retornar, buscar via user_profiles
+      let orgId = org?.id;
+      if (!orgId) {
+        console.log('[UPGRADE-PLAN] Fallback: buscando via user_profiles...');
+        const { data: profile } = await supabase
+          .from('user_profiles')
+          .select('organization_id')
+          .eq('id', user.id)
+          .maybeSingle();
+        orgId = profile?.organization_id;
+      }
+
+      if (!orgId) {
+        clearTimeout(timeout);
+        console.error(`[UPGRADE-PLAN] Org não encontrada para ${user.email}`);
+        return res.status(404).json({ error: 'Organização não encontrada para este usuário' });
+      }
+
+      // 3. Atualizar o plano com service role (sem restrições de RLS)
+      const nextBilling = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+      const { data: updated, error: updateErr } = await supabase
+        .from('organizations')
+        .update({
+          plan: planId,
+          payment_status: 'pending',
+          subscription_expires_at: nextBilling,
+          status: 'active'
+        })
+        .eq('id', orgId)
+        .select('id, name, plan, payment_status')
+        .single();
+
+      clearTimeout(timeout);
+
+      if (updateErr) {
+        console.error('[UPGRADE-PLAN] Erro no update:', updateErr.message);
+        return res.status(500).json({ error: updateErr.message });
+      }
+
+      console.log('[UPGRADE-PLAN] Sucesso!', updated);
+      res.json({ success: true, organization: updated });
+    } catch (err: any) {
+      clearTimeout(timeout);
+      console.error('[UPGRADE-PLAN] Erro inesperado:', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // Change plan for logged-in store
   app.post("/api/subscription/change-plan", async (req, res) => {
     const requestId = Math.random().toString(36).substring(7);
