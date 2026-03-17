@@ -89,17 +89,30 @@ export default function RegisterPage() {
 
          console.log('Iniciando upgrade para organização:', orgId, { urlOrgId, profileOrgId: profile?.organization_id });
 
-         // Se ainda não houver ID, tenta buscar por owner_email
-         if (!orgId && session.user.email) {
-           const { data: ownedOrg } = await supabase
-             .from('organizations')
-             .select('id')
-             .eq('owner_email', session.user.email)
-             .limit(1)
-             .maybeSingle();
-           
-           if (ownedOrg) orgId = ownedOrg.id;
-         }
+          // Se ainda não houver ID, tenta buscar por owner_email
+          if (!orgId && session.user.email) {
+            console.log('[DEBUG] Buscando orgId por email do dono:', session.user.email);
+            try {
+              // Timeout curto para busca de org
+              const { data: ownedOrg, error: findError } = await Promise.race([
+                supabase
+                  .from('organizations')
+                  .select('id')
+                  .eq('owner_email', session.user.email)
+                  .limit(1)
+                  .maybeSingle(),
+                new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 8000))
+              ]) as any;
+
+              if (findError) console.error('[DEBUG] Erro ao buscar org:', findError);
+              if (ownedOrg) {
+                orgId = ownedOrg.id;
+                console.log('[DEBUG] Org encontrada via email:', orgId);
+              }
+            } catch (e) {
+              console.warn('[DEBUG] Busca de org por email falhou ou deu timeout.');
+            }
+          }
           if (orgId) {
              console.log('[DEBUG] Tentando upgrade via API externa. Org:', orgId);
              
