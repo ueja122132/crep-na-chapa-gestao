@@ -50,46 +50,7 @@ async function getOrganizationFromAuth(authHeader: string | undefined) {
       return orgByEmail.id;
     }
 
-    // Estratégia 3: admin bypass — pega "tem de tudo" preferencialmente
-    const adminEmails = [
-      'superadmin@gmail.com',
-      'ajeu.trindade@gmail.com',
-      'ajeu.valverde@gmail.com',
-      'ajeu@gmail.com'
-    ];
-    if (adminEmails.includes(user.email || '')) {
-      console.log(`[AUTH] Admin bypass para ${user.email}`);
-      const { data: mainOrg } = await supabase
-        .from('organizations')
-        .select('id')
-        .or('slug.eq.crep-na-chapa,name.ilike.%crep%,slug.ilike.%crep-na-chapa%')
-        .limit(1)
-        .maybeSingle();
-      if (mainOrg?.id) {
-        console.log(`[AUTH] Org admin encontrada (Crep na Chapa - Produtos Reais): ${mainOrg.id}`);
-        return mainOrg.id;
-      }
-      
-      // Fallback 3.1: Qualquer outra org se Crep na Chapa não existir
-      const { data: anyOrg } = await supabase
-        .from('organizations')
-        .select('id')
-        .order('created_at', { ascending: true }) // A mais antiga, que é a original
-        .limit(1)
-        .maybeSingle();
-      if (anyOrg?.id) {
-        return anyOrg.id;
-      }
-    }
-
-    // Estratégia 4: única org no sistema
-    const { data: allOrgs } = await supabase.from('organizations').select('id');
-    if (allOrgs?.length === 1) {
-      console.log('[AUTH] Org única:', allOrgs[0].id);
-      return allOrgs[0].id;
-    }
-
-    throw new Error('Organization context not found.');
+    throw new Error(`Organization context not found for user ${user.id} (${user.email}).`);
   } catch (err: any) {
     console.error('[AUTH] ERRO FATAL:', err.message);
     throw err;

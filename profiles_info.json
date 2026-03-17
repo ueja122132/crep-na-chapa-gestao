@@ -1,0 +1,23 @@
+[
+  {
+    "id": "ad52c217-ba21-4e9e-8438-73476cb6986b",
+    "organization_id": "9b1462c0-d902-4fdc-9542-7a92f6c28402",
+    "full_name": "ajeu",
+    "created_at": "2026-03-16T02:45:18.064966+00:00",
+    "role": "admin"
+  },
+  {
+    "id": "f1044cea-ce0a-4aac-a299-11bb318ddb62",
+    "organization_id": "ba2087fe-0498-43f4-93dc-bdf9f2f1ce66",
+    "full_name": "Administrador Crep",
+    "created_at": "2026-03-16T01:48:49.875984+00:00",
+    "role": "admin"
+  },
+  {
+    "id": "ad456bfa-50bf-4175-bc34-57b886831389",
+    "organization_id": "9b1462c0-d902-4fdc-9542-7a92f6c28402",
+    "full_name": "Super Administrador Global",
+    "created_at": "2026-03-16T15:09:09.888588+00:00",
+    "role": "super_admin"
+  }
+]
