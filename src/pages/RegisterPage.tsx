@@ -79,7 +79,8 @@ export default function RegisterPage() {
       const data = await res.json();
       console.log('[UPGRADE] Sucesso!', data);
       setSuccess(true);
-      setTimeout(() => navigate('/vendas'), 2500);
+      // Forçar reload completo para limpar cache do SubscriptionWidget
+      setTimeout(() => { window.location.href = '/vendas'; }, 2500);
     } catch (err: any) {
       if (err.name === 'AbortError') {
         setError('Tempo limite atingido. Verifique sua conexão e tente novamente.');
