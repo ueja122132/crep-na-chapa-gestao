@@ -101,31 +101,52 @@ export default function RegisterPage() {
            if (ownedOrg) orgId = ownedOrg.id;
          }
           if (orgId) {
-             console.log('[DEBUG] Iniciando upgrade via API para org:', orgId, 'plano:', planId);
+             console.log('[DEBUG] Tentando upgrade via API externa. Org:', orgId);
              
              try {
+               // Timeout de 15 segundos para evitar hang infinito no spinner
+               const controller = new AbortController();
+               const timeoutId = setTimeout(() => {
+                 console.error('[DEBUG] A API de upgrade demorou demais e foi abortada pelo cliente.');
+                 controller.abort();
+               }, 15000);
+
                const response = await fetch('/api/subscription/change-plan', {
                  method: 'POST',
                  headers: {
                    'Authorization': `Bearer ${session?.access_token}`,
                    'Content-Type': 'application/json'
                  },
-                 body: JSON.stringify({ planId })
+                 body: JSON.stringify({ planId }),
+                 signal: controller.signal
                });
                
+               clearTimeout(timeoutId);
+
                if (!response.ok) {
-                 const errorData = await response.json().catch(() => ({}));
-                 throw new Error(errorData.error || 'Erro na comunicação com o servidor');
+                 const errorText = await response.text();
+                 console.error('[DEBUG] Resposta do servidor não-OK:', response.status, errorText);
+                 try {
+                   const errorData = JSON.parse(errorText);
+                   throw new Error(errorData.error || `Erro do servidor (${response.status})`);
+                 } catch (e) {
+                   throw new Error(`Erro inesperado no servidor: ${response.status}`);
+                 }
                }
 
                const updatedOrg = await response.json();
-               console.log('[DEBUG] Upgrade via API concluído:', updatedOrg);
+               console.log('[DEBUG] Upgrade via API finalizado com sucesso!', updatedOrg);
                
                setSuccess(true);
                setTimeout(() => navigate('/vendas'), 2500);
                return;
              } catch (updateErr: any) {
-               console.error('[DEBUG] Erro capturado no upgrade via API:', updateErr);
+               setLoading(false);
+               if (updateErr.name === 'AbortError') {
+                 console.error('[DEBUG] A requisição foi cancelada por timeout.');
+                 throw new Error('O servidor está demorando muito para responder. Verifique sua internet ou tente novamente em instantes.');
+               }
+               console.error('[DEBUG] Falha crítica no fetch de upgrade:', updateErr);
                throw updateErr;
              }
           } else {

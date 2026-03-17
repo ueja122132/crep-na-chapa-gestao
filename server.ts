@@ -647,16 +647,28 @@ async function startServer() {
 
   // Change plan for logged-in store
   app.post("/api/subscription/change-plan", async (req, res) => {
-    console.log('[API] Recebida requisição de troca de plano');
+    const requestId = Math.random().toString(36).substring(7);
+    console.log(`[API][${requestId}] Request iniciada para troca de plano`);
+    
+    // Proteção de Timeout no Servidor
+    const serverTimeout = setTimeout(() => {
+      console.error(`[API][${requestId}] SERVER TIMEOUT: A operação excedeu 12 segundos.`);
+      if (!res.headersSent) {
+        res.status(504).json({ error: 'Servidor demorou a responder. Tente novamente.' });
+      }
+    }, 12000);
+
     try {
       const { planId } = req.body;
       if (!planId) {
-        console.warn('[API] planId ausente');
+        clearTimeout(serverTimeout);
+        console.warn(`[API][${requestId}] planId ausente`);
         return res.status(400).json({ error: 'Missing planId' });
       }
 
+      console.log(`[API][${requestId}] Resolvendo organização...`);
       const orgId = await getOrganizationFromAuth(req.headers.authorization);
-      console.log(`[API] Processando upgrade: Org ${orgId} -> ${planId}`);
+      console.log(`[API][${requestId}] Org vinculada: ${orgId}. Iniciando Update...`);
 
       const { data, error } = await supabase
         .from('organizations')
@@ -669,16 +681,21 @@ async function startServer() {
         .select()
         .single();
 
+      clearTimeout(serverTimeout);
+
       if (error) {
-        console.error('[API] Erro no update Supabase:', error);
-        throw error;
+        console.error(`[API][${requestId}] Erro Supabase:`, error.message);
+        return res.status(500).json({ error: error.message });
       }
       
-      console.log(`[API] Upgrade finalizado com sucesso para Org ${orgId}`);
+      console.log(`[API][${requestId}] Upgrade OK! Retornando dados.`);
       res.json(data);
     } catch (err: any) {
-      console.error('[API] ERRO NO CHANGE-PLAN:', err.message);
-      res.status(500).json({ error: err.message });
+      clearTimeout(serverTimeout);
+      console.error(`[API][${requestId}] EXCEÇÃO CRÍTICA:`, err.message);
+      if (!res.headersSent) {
+        res.status(500).json({ error: err.message });
+      }
     }
   });
 
