@@ -710,18 +710,17 @@ async function startServer() {
         }
       }
 
-      // Estratégia 3: Sistema single-store — pegar a única organização disponível
+      // Estratégia 3: Sistema single-store — pegar qualquer organização existente
       if (!orgId) {
-        console.log(`[UPGRADE-PLAN] Estratégia 3: pegando org disponível no sistema...`);
+        console.log(`[UPGRADE-PLAN] Estratégia 3: pegando primeira org do sistema...`);
         const { data: mainOrg } = await supabase
           .from('organizations')
           .select('id, name')
-          .eq('status', 'active')
           .limit(1)
           .maybeSingle();
         if (mainOrg?.id) {
           orgId = mainOrg.id;
-          console.log(`[UPGRADE-PLAN] Estratégia 3 (primeira org ativa): ${orgId} (${mainOrg.name})`);
+          console.log(`[UPGRADE-PLAN] Estratégia 3 (primeira org): ${orgId} (${mainOrg.name})`);
         }
       }
 
@@ -733,7 +732,7 @@ async function startServer() {
 
       // Atualizar o plano
       const nextBilling = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-      const { data: updated, error: updateErr } = await supabase
+      const { error: updateErr } = await supabase
         .from('organizations')
         .update({
           plan: planId,
@@ -741,9 +740,7 @@ async function startServer() {
           subscription_expires_at: nextBilling,
           status: 'active'
         })
-        .eq('id', orgId)
-        .select('id, name, plan, payment_status')
-        .single();
+        .eq('id', orgId);
 
       clearTimeout(timeout);
 
@@ -752,8 +749,8 @@ async function startServer() {
         return res.status(500).json({ error: updateErr.message });
       }
 
-      console.log('[UPGRADE-PLAN] Sucesso!', updated);
-      res.json({ success: true, organization: updated });
+      console.log('[UPGRADE-PLAN] Sucesso! Plano atualizado para:', planId);
+      res.json({ success: true, planId, orgId });
     } catch (err: any) {
       clearTimeout(timeout);
       console.error('[UPGRADE-PLAN] Erro inesperado:', err.message);
