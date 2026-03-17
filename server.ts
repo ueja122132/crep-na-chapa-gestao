@@ -27,24 +27,35 @@ async function getOrganizationFromAuth(authHeader: string | undefined) {
 
     console.log(`[AUTH] Usuário: ${user.email} (${user.id})`);
 
+    // Criar um cliente com a autenticação do próprio usuário para furar bloqueios de RLS 
+    const userSupabase = createClient(supabaseUrl, supabaseKey, {
+      global: { headers: { Authorization: authHeader } }
+    });
+
     // Estratégia 1: user_profiles.organization_id (id = auth.users.id)
-    const { data: up } = await supabase
+    const { data: up, error: upError } = await userSupabase
       .from('user_profiles')
       .select('organization_id')
       .eq('id', user.id)
       .maybeSingle();
+      
+    if (upError) console.error('[AUTH] RLS Erro - user_profiles:', upError.message);
+
     if (up?.organization_id) {
       console.log(`[AUTH] Org via user_profiles: ${up.organization_id}`);
       return up.organization_id;
     }
 
     // Estratégia 2: organizations.owner_email = user.email
-    const { data: orgByEmail } = await supabase
+    const { data: orgByEmail, error: orgError } = await userSupabase
       .from('organizations')
       .select('id')
       .eq('owner_email', user.email)
       .limit(1)
       .maybeSingle();
+      
+    if (orgError) console.error('[AUTH] RLS Erro - organizations:', orgError.message);
+
     if (orgByEmail?.id) {
       console.log(`[AUTH] Org via owner_email: ${orgByEmail.id}`);
       return orgByEmail.id;
@@ -522,13 +533,13 @@ async function startServer() {
       // 1. Get all organizations with owner info
       const { data: orgs, error: orgsError } = await supabase
         .from('organizations')
-        .select(`
-          *,
-          user_profiles!inner(email, name)
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
-      if (orgsError) throw orgsError;
+      if (orgsError) {
+        console.error('Supabase get orgs error:', orgsError);
+        throw orgsError;
+      }
 
       // 2. Get order summary for all organizations
       const { data: orderStats, error: statsError } = await supabase
@@ -536,17 +547,17 @@ async function startServer() {
         .select('organization_id, total_price')
         .eq('payment_status', 'paid');
 
-      if (statsError) throw statsError;
+      if (statsError) {
+        console.error('Supabase get orders error:', statsError);
+        throw statsError;
+      }
 
-      // 3. Map orders to organizations and flatten owner info
+      // 3. Map orders to organizations
       const mappedOrgs = orgs.map((org: any) => {
         const orgOrders = orderStats.filter(o => o.organization_id === org.id);
-        const ownerProfile = Array.isArray(org.user_profiles) ? org.user_profiles[0] : org.user_profiles;
 
         return {
           ...org,
-          owner_email: ownerProfile?.email,
-          owner_name: ownerProfile?.name,
           total_orders: orgOrders.length,
           total_sales: orgOrders.reduce((acc: number, curr: any) => acc + (curr.total_price || 0), 0)
         };
