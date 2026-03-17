@@ -66,12 +66,11 @@ export default function RegisterPage() {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    console.log('[REGISTRO] Iniciando processo...');
+    console.log('[REGISTRO] Iniciando...');
 
     const watchdog = setTimeout(() => {
       setLoading(prev => {
         if (prev) {
-          console.error('[REGISTRO] Watchdog disparado (20s)');
           setError('O servidor demorou muito a responder. Verifique sua conexão e tente novamente.');
           return false;
         }
@@ -84,23 +83,34 @@ export default function RegisterPage() {
         // --- UPGRADE DIRETO NO SUPABASE (sem servidor) ---
         let orgIdToUpdate: string | null = urlOrgId || profile?.organization_id || null;
 
-        // Se não temos o ID ainda, buscar via owner_id na tabela organizations
-        if (!orgIdToUpdate && session?.user?.id) {
-          console.log('[UPGRADE] Buscando organização via owner_id...');
+        // Buscar organização pelo email do usuário logado (campo real: owner_email)
+        if (!orgIdToUpdate && session?.user?.email) {
+          console.log('[UPGRADE] Buscando org via owner_email:', session.user.email);
           const { data: ownedOrg } = await supabase
             .from('organizations')
             .select('id')
-            .eq('owner_id', session.user.id)
+            .eq('owner_email', session.user.email)
             .limit(1)
             .maybeSingle();
           if (ownedOrg?.id) orgIdToUpdate = ownedOrg.id;
+        }
+
+        // Fallback: buscar via user_profiles.organization_id
+        if (!orgIdToUpdate && session?.user?.id) {
+          console.log('[UPGRADE] Fallback: buscando org via user_profiles...');
+          const { data: up } = await supabase
+            .from('user_profiles')
+            .select('organization_id')
+            .eq('id', session.user.id)
+            .maybeSingle();
+          if (up?.organization_id) orgIdToUpdate = up.organization_id;
         }
 
         if (!orgIdToUpdate) {
           throw new Error('Não foi possível identificar sua loja. Entre em contato com o suporte.');
         }
 
-        console.log('[UPGRADE] Atualizando para plano:', planId, 'org:', orgIdToUpdate);
+        console.log('[UPGRADE] Atualizando para plano:', planId, '| Org:', orgIdToUpdate);
         const { error: upgradeError } = await supabase
           .from('organizations')
           .update({
