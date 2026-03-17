@@ -50,7 +50,7 @@ async function getOrganizationFromAuth(authHeader: string | undefined) {
       return orgByEmail.id;
     }
 
-    // Estratégia 3: admin bypass — pega qualquer org disponível
+    // Estratégia 3: admin bypass — pega "tem de tudo" preferencialmente
     const adminEmails = [
       'superadmin@gmail.com',
       'ajeu.trindade@gmail.com',
@@ -59,14 +59,25 @@ async function getOrganizationFromAuth(authHeader: string | undefined) {
     ];
     if (adminEmails.includes(user.email || '')) {
       console.log(`[AUTH] Admin bypass para ${user.email}`);
+      const { data: mainOrg } = await supabase
+        .from('organizations')
+        .select('id')
+        .or('slug.eq.tem-de-tudo,name.ilike.%tem de tudo%,slug.ilike.%tem-de-tudo%')
+        .limit(1)
+        .maybeSingle();
+      if (mainOrg?.id) {
+        console.log(`[AUTH] Org admin encontrada (Tem de tudo): ${mainOrg.id}`);
+        return mainOrg.id;
+      }
+      
+      // Fallback 3.1: Qualquer outra org se Tem de Tudo não existir
       const { data: anyOrg } = await supabase
         .from('organizations')
         .select('id')
-        .order('created_at', { ascending: true })
+        .order('created_at', { ascending: false }) // Pega a mais recente
         .limit(1)
         .maybeSingle();
       if (anyOrg?.id) {
-        console.log(`[AUTH] Org admin: ${anyOrg.id}`);
         return anyOrg.id;
       }
     }
