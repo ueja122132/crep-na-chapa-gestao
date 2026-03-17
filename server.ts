@@ -16,60 +16,69 @@ const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABAS
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Utility to resolve organization from Auth Header
+// Schema real confirmado: user_profiles (id→auth, organization_id), organizations (owner_email, payment_status, subscription_expires_at)
 async function getOrganizationFromAuth(authHeader: string | undefined) {
-  console.log('[AUTH] Analisando header de autorização...');
   try {
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      console.warn('[AUTH] Header ausente ou inválido');
-      throw new Error('Missing or invalid Authorization header');
-    }
+    if (!authHeader?.startsWith('Bearer ')) throw new Error('Missing Authorization header');
 
     const token = authHeader.split(' ')[1];
-    console.log('[AUTH] Token extraído. Verificando usuário no Supabase...');
-    
-    // 1. Get user from token
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    if (authError || !user) {
-      console.error('[AUTH] Erro ao validar token:', authError);
-      throw new Error('Unauthorized');
-    }
+    if (authError || !user) throw new Error('Unauthorized');
 
-    console.log(`[AUTH] Usuário validado: ${user.email} (${user.id}). Buscando perfil...`);
+    console.log(`[AUTH] Usuário: ${user.email} (${user.id})`);
 
-    // 2. Get organization_id from user_profiles
-    const { data: profile, error: profileError } = await supabase
+    // Estratégia 1: user_profiles.organization_id (id = auth.users.id)
+    const { data: up } = await supabase
       .from('user_profiles')
       .select('organization_id')
       .eq('id', user.id)
-      .single();
-
-    if (profileError || !profile) {
-      console.warn(`[AUTH] Perfil não encontrado para ${user.email}. Tentando fallbacks...`);
-      
-      const adminEmails = ['superadmin@gmail.com'];
-      const isAdmin = adminEmails.includes(user.email || '');
-
-      if (isAdmin) {
-         console.log(`[AUTH] Admin bypass para ${user.email}. Buscando org principal...`);
-         const { data: mainOrg } = await supabase.from('organizations').select('id').eq('slug', 'tem-de-tudo').single();
-         if (mainOrg) {
-           console.log(`[AUTH] Fallback bem-sucedido: Org ${mainOrg.id}`);
-           return mainOrg.id;
-         }
-      }
-
-      console.log('[AUTH] Tentando fallback de organização única...');
-      const { data: orgs } = await supabase.from('organizations').select('id');
-      if (orgs && orgs.length === 1) {
-        console.log('[AUTH] Organização única detectada.');
-        return orgs[0].id;
-      }
-      
-      throw new Error('Organization context not found.');
+      .maybeSingle();
+    if (up?.organization_id) {
+      console.log(`[AUTH] Org via user_profiles: ${up.organization_id}`);
+      return up.organization_id;
     }
 
-    console.log(`[AUTH] Organização identificada: ${profile.organization_id}`);
-    return profile.organization_id;
+    // Estratégia 2: organizations.owner_email = user.email
+    const { data: orgByEmail } = await supabase
+      .from('organizations')
+      .select('id')
+      .eq('owner_email', user.email)
+      .limit(1)
+      .maybeSingle();
+    if (orgByEmail?.id) {
+      console.log(`[AUTH] Org via owner_email: ${orgByEmail.id}`);
+      return orgByEmail.id;
+    }
+
+    // Estratégia 3: admin bypass — pega qualquer org disponível
+    const adminEmails = [
+      'superadmin@gmail.com',
+      'ajeu.trindade@gmail.com',
+      'ajeu.valverde@gmail.com',
+      'ajeu@gmail.com'
+    ];
+    if (adminEmails.includes(user.email || '')) {
+      console.log(`[AUTH] Admin bypass para ${user.email}`);
+      const { data: anyOrg } = await supabase
+        .from('organizations')
+        .select('id')
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      if (anyOrg?.id) {
+        console.log(`[AUTH] Org admin: ${anyOrg.id}`);
+        return anyOrg.id;
+      }
+    }
+
+    // Estratégia 4: única org no sistema
+    const { data: allOrgs } = await supabase.from('organizations').select('id');
+    if (allOrgs?.length === 1) {
+      console.log('[AUTH] Org única:', allOrgs[0].id);
+      return allOrgs[0].id;
+    }
+
+    throw new Error('Organization context not found.');
   } catch (err: any) {
     console.error('[AUTH] ERRO FATAL:', err.message);
     throw err;
@@ -86,7 +95,7 @@ async function requireSuperAdmin(req: any, res: any, next: any) {
 
     const token = authHeader.split(' ')[1];
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    
+
     if (authError || !user) {
       console.error('requireSuperAdmin: Auth error resolving user:', authError);
       return res.status(401).json({ error: 'Unauthorized' });
@@ -125,7 +134,7 @@ async function startServer() {
   app.use(express.json());
 
   // API Routes
-  
+
   // Settings
   app.get('/api/settings', async (req, res) => {
     try {
@@ -134,7 +143,7 @@ async function startServer() {
         .from('settings')
         .select('*')
         .eq('organization_id', orgId);
-      
+
       const defaultSettings = [
         { key: 'extra_ingredient_price', value: '5.00' }
       ];
@@ -153,12 +162,12 @@ async function startServer() {
     try {
       const orgId = await getOrganizationFromAuth(req.headers.authorization);
       const { key, value } = req.body;
-      
+
       const { error } = await supabase
         .from('settings')
-        .upsert({ 
+        .upsert({
           organization_id: orgId,
-          key, 
+          key,
           value,
           updated_at: new Date().toISOString()
         }, { onConflict: 'organization_id, key' });
@@ -184,14 +193,14 @@ async function startServer() {
         .from("products")
         .select("*")
         .eq('organization_id', orgId);
-      
+
       if (error) {
         console.error('Supabase error fetching products:', error);
         throw error;
       }
 
-      res.json(data.map((p: any) => ({ 
-        ...p, 
+      res.json(data.map((p: any) => ({
+        ...p,
         ingredients: typeof p.ingredients === 'string' ? JSON.parse(p.ingredients) : (p.ingredients || [])
       })));
     } catch (error: any) {
@@ -203,7 +212,7 @@ async function startServer() {
   app.post("/api/products", async (req, res) => {
     try {
       const { name, type, price, ingredients } = req.body;
-      
+
       if (!name || !type || price === undefined) {
         return res.status(400).json({ error: "Missing required fields: name, type, price" });
       }
@@ -247,7 +256,7 @@ async function startServer() {
     try {
       const { name, type, price, ingredients } = req.body;
       const orgId = await getOrganizationFromAuth(req.headers.authorization);
-      
+
       const updates: any = {};
       if (name) updates.name = name;
       if (type) updates.type = type;
@@ -282,9 +291,9 @@ async function startServer() {
         .select("*, order_items(*)")
         .eq('organization_id', orgId)
         .order("created_at", { ascending: true });
-      
+
       if (ordersError) throw ordersError;
-      
+
       res.json(orders.map(order => ({
         ...order,
         items: (order.order_items || []).map((item: any) => ({
@@ -304,7 +313,7 @@ async function startServer() {
   app.post("/api/orders", async (req, res) => {
     try {
       const { customer_name, total_price, items, payment_status, payment_method, amount_received } = req.body;
-      
+
       if (!items || !Array.isArray(items) || items.length === 0 || total_price === undefined) {
         return res.status(400).json({ error: "Invalid order data: items and total_price are required" });
       }
@@ -396,13 +405,13 @@ async function startServer() {
 
       const { error } = await supabase
         .from("orders")
-        .update({ 
-          payment_status, 
-          payment_method: payment_method || null, 
-          amount_received: amount_received || null 
+        .update({
+          payment_status,
+          payment_method: payment_method || null,
+          amount_received: amount_received || null
         })
         .eq("id", req.params.id);
-      
+
       if (error) throw error;
       res.json({ success: true });
     } catch (error) {
@@ -421,9 +430,9 @@ async function startServer() {
         .select("total_price, created_at, payment_method, order_items(product_type, product_name)")
         .eq('organization_id', orgId)
         .eq("payment_status", "paid");
-      
+
       if (fallbackError) throw fallbackError;
-      
+
       // Manual grouping
       const statsMap = new Map();
       fallbackData.forEach((order: any) => {
@@ -432,19 +441,19 @@ async function startServer() {
         const d = new Date(order.created_at);
         const brtDate = new Date(d.getTime() - (3 * 60 * 60 * 1000));
         const date = brtDate.toISOString().split('T')[0];
-        
-        const current = statsMap.get(date) || { 
-          total_revenue: 0, 
-          total_orders: 0, 
+
+        const current = statsMap.get(date) || {
+          total_revenue: 0,
+          total_orders: 0,
           date,
           by_method: { pix: 0, dinheiro: 0, cartao: 0 },
           by_type: { crepe: 0, churrasco: 0 },
           product_sales: {} as Record<string, number>
         };
-        
+
         current.total_revenue += order.total_price;
         current.total_orders += 1;
-        
+
         // Group by method
         if (order.payment_method) {
           const method = order.payment_method.toLowerCase();
@@ -452,7 +461,7 @@ async function startServer() {
             current.by_method[method] += order.total_price;
           }
         }
-        
+
         // Group by product type and count sales for ranking
         if (order.order_items) {
           order.order_items.forEach((item: any) => {
@@ -467,17 +476,17 @@ async function startServer() {
             }
           });
         }
-        
+
         statsMap.set(date, current);
       });
-      
+
       const statsList = Array.from(statsMap.values()).map((s: any) => {
         // Convert product_sales to a sorted Top 3 array
         const top_products = Object.entries(s.product_sales)
           .map(([name, count]) => ({ name, count }))
           .sort((a: any, b: any) => b.count - a.count)
           .slice(0, 3);
-          
+
         const { product_sales, ...rest } = s;
         return { ...rest, top_products };
       });
@@ -496,11 +505,11 @@ async function startServer() {
       // Fetch all organizations using select(*) to avoid errors if status column is missing
       const { data: orgs, error: orgsError } = await supabase.from('organizations').select('*');
       if (orgsError) throw orgsError;
-      
+
       // Fetch all paid orders to calculate revenue
       const { data: orders, error: ordersError } = await supabase.from('orders').select('total_price').eq('payment_status', 'paid');
       if (ordersError) throw ordersError;
-      
+
       const globalStats = {
         total_revenue: orders?.reduce((acc: number, curr: any) => acc + Number(curr.total_price), 0) || 0,
         total_orders: orders?.length || 0,
@@ -532,7 +541,7 @@ async function startServer() {
 
       res.json({ ranking });
     } catch (error) {
-       res.status(500).json({ error: 'Error fetching metrics' });
+      res.status(500).json({ error: 'Error fetching metrics' });
     }
   });
 
@@ -546,7 +555,7 @@ async function startServer() {
           user_profiles!inner(email, name)
         `)
         .order('created_at', { ascending: false });
-      
+
       if (orgsError) throw orgsError;
 
       // 2. Get order summary for all organizations
@@ -561,7 +570,7 @@ async function startServer() {
       const mappedOrgs = orgs.map((org: any) => {
         const orgOrders = orderStats.filter(o => o.organization_id === org.id);
         const ownerProfile = Array.isArray(org.user_profiles) ? org.user_profiles[0] : org.user_profiles;
-        
+
         return {
           ...org,
           owner_email: ownerProfile?.email,
@@ -606,7 +615,7 @@ async function startServer() {
         .eq('organization_id', req.params.id)
         .order('created_at', { ascending: false })
         .limit(50);
-      
+
       if (error) throw error;
       res.json(data);
     } catch (error) {
@@ -653,7 +662,7 @@ async function startServer() {
   });
 
   // =============================================
-  // NOVO ENDPOINT: Upgrade de Plano (Multi-Estratégia)
+  // NOVO ENDPOINT: Upgrade de Plano (Consolidado)
   // =============================================
   app.post("/api/upgrade-plan", async (req, res) => {
     console.log('[UPGRADE-PLAN] Requisição recebida');
@@ -683,73 +692,43 @@ async function startServer() {
 
       console.log(`[UPGRADE-PLAN] User: ${user.email} (${user.id}) | Plano: ${planId}`);
 
+      // Usa a busca de organização mestra (5 estratégias com schema real)
       let orgId: string | null = null;
-
-      // Estratégia 1: owner_email direto na tabela organizations
-      const { data: orgByEmail } = await supabase
-        .from('organizations')
-        .select('id')
-        .eq('owner_email', user.email)
-        .limit(1)
-        .maybeSingle();
-      if (orgByEmail?.id) {
-        orgId = orgByEmail.id;
-        console.log(`[UPGRADE-PLAN] Estratégia 1 (owner_email): ${orgId}`);
-      }
-
-      // Estratégia 2: user_profiles.organization_id
-      if (!orgId) {
-        const { data: profile } = await supabase
-          .from('user_profiles')
-          .select('organization_id')
-          .eq('id', user.id)
-          .maybeSingle();
-        if (profile?.organization_id) {
-          orgId = profile.organization_id;
-          console.log(`[UPGRADE-PLAN] Estratégia 2 (user_profiles): ${orgId}`);
-        }
-      }
-
-      // Estratégia 3: Sistema single-store — pegar qualquer organização existente
-      if (!orgId) {
-        console.log(`[UPGRADE-PLAN] Estratégia 3: pegando primeira org do sistema...`);
-        const { data: mainOrg } = await supabase
-          .from('organizations')
-          .select('id, name')
-          .limit(1)
-          .maybeSingle();
-        if (mainOrg?.id) {
-          orgId = mainOrg.id;
-          console.log(`[UPGRADE-PLAN] Estratégia 3 (primeira org): ${orgId} (${mainOrg.name})`);
-        }
+      try {
+        orgId = await getOrganizationFromAuth(authHeader);
+      } catch (e: any) {
+        console.error(`[UPGRADE-PLAN] Fallback falhou: ${e.message}`);
       }
 
       if (!orgId) {
         clearTimeout(timeout);
-        console.error(`[UPGRADE-PLAN] Nenhuma org encontrada para ${user.email}`);
-        return res.status(404).json({ error: `Organização não encontrada. Email: ${user.email}` });
+        return res.status(404).json({ error: `Organização não encontrada para: ${user.email}` });
       }
 
-      // Atualizar o plano
+      console.log(`[UPGRADE-PLAN] Organização resolvida: ${orgId}. Atualizando para ${planId}...`);
+
+      // Atualizar o plano com o schema real confirmado
       const nextBilling = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+      const updatePayload = {
+        plan: planId,
+        payment_status: 'pending',
+        subscription_expires_at: nextBilling,
+        status: 'active'
+      };
+
       const { error: updateErr } = await supabase
         .from('organizations')
-        .update({
-          plan: planId,
-          payment_status: 'pending',
-          subscription_expires_at: nextBilling,
-          status: 'active'
-        })
+        .update(updatePayload)
         .eq('id', orgId);
 
       clearTimeout(timeout);
 
       if (updateErr) {
-        console.error('[UPGRADE-PLAN] Erro no update:', updateErr.message);
+        console.error('[UPGRADE-PLAN] Erro no update do Supabase:', updateErr.message);
         return res.status(500).json({ error: updateErr.message });
       }
 
-      console.log('[UPGRADE-PLAN] Sucesso! Plano atualizado para:', planId);
+      console.log('[UPGRADE-PLAN] Sucesso! Plano atualizado.');
       res.json({ success: true, planId, orgId });
     } catch (err: any) {
       clearTimeout(timeout);
@@ -762,7 +741,7 @@ async function startServer() {
   app.post("/api/subscription/change-plan", async (req, res) => {
     const requestId = Math.random().toString(36).substring(7);
     console.log(`[API][${requestId}] Request iniciada para troca de plano`);
-    
+
     // Proteção de Timeout no Servidor
     const serverTimeout = setTimeout(() => {
       console.error(`[API][${requestId}] SERVER TIMEOUT: A operação excedeu 12 segundos.`);
@@ -785,8 +764,8 @@ async function startServer() {
 
       const { data, error } = await supabase
         .from('organizations')
-        .update({ 
-          plan: planId, 
+        .update({
+          plan: planId,
           payment_status: 'pending',
           subscription_expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
         })
@@ -800,7 +779,7 @@ async function startServer() {
         console.error(`[API][${requestId}] Erro Supabase:`, error.message);
         return res.status(500).json({ error: error.message });
       }
-      
+
       console.log(`[API][${requestId}] Upgrade OK! Retornando dados.`);
       res.json(data);
     } catch (err: any) {
@@ -812,15 +791,15 @@ async function startServer() {
     }
   });
 
-   app.patch("/api/admin/organizations/:id/payment", requireSuperAdmin, async (req, res) => {
+  app.patch("/api/admin/organizations/:id/payment", requireSuperAdmin, async (req, res) => {
     try {
       const { payment_status, subscription_expires_at } = req.body;
       const updates: any = {};
-      
+
       // Mapeamento de campos (Rollback para esquema legado)
       if (payment_status) updates.payment_status = payment_status; // 'paid', 'pending', etc.
       if (subscription_expires_at) updates.subscription_expires_at = subscription_expires_at;
-      
+
       // If confirming payment, also set status to active
       if (payment_status === 'paid') updates.status = 'active';
 
@@ -851,7 +830,7 @@ async function startServer() {
   } else {
     // Serve static files from dist
     app.use(express.static(path.join(__dirname, "dist")));
-    
+
     // Catch-all route for SPA - MUST BE LAST
     app.get("*", (req, res, next) => {
       // If it's an API route that wasn't matched, skip to error/404
