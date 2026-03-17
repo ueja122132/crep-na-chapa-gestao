@@ -403,6 +403,59 @@ async function startServer() {
     }
   });
 
+  // Settings
+  app.get("/api/settings", async (req, res) => {
+    try {
+      const orgId = await getOrganizationFromAuth(req.headers.authorization);
+      const { data, error } = await supabase
+        .from("store_settings")
+        .select("key, value")
+        .eq("organization_id", orgId);
+      
+      if (error) {
+        // If table doesn't exist yet, return empty array to prevent 500
+        if (error.code === '42P01') return res.json([]);
+        throw error;
+      }
+      res.json(data || []);
+    } catch (error: any) {
+      console.error("Error fetching settings:", error);
+      res.status(500).json({ error: "Internal server error fetching settings" });
+    }
+  });
+
+  app.post("/api/settings", async (req, res) => {
+    try {
+      const orgId = await getOrganizationFromAuth(req.headers.authorization);
+      const { key, value } = req.body;
+      
+      if (!key || value === undefined) {
+        return res.status(400).json({ error: "Missing key or value" });
+      }
+
+      // Upsert configuration
+      const { error } = await supabase
+        .from("store_settings")
+        .upsert({ 
+          organization_id: orgId, 
+          key, 
+          value: String(value) 
+        }, { onConflict: 'organization_id,key' });
+
+      if (error) {
+        if (error.code === '42P01') {
+          return res.status(500).json({ error: "A tabela de configurações ainda não foi criada no Supabase." });
+        }
+        throw error;
+      }
+      
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Error saving setting:", error);
+      res.status(500).json({ error: "Internal server error saving settings" });
+    }
+  });
+
   // Finance
   app.get("/api/finance/stats", async (req, res) => {
     try {
