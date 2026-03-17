@@ -39,8 +39,8 @@ interface StoreMetric {
   total_orders: number;
   total_sales: number;
   created_at: string;
-  payment_status?: string;
-  subscription_expires_at?: string;
+  subscription_status?: string;
+  next_billing_date?: string;
   owner_email?: string;
   owner_name?: string;
 }
@@ -69,9 +69,9 @@ const PLAN_COLORS: Record<string, string> = {
 };
 
 const PAYMENT_STATUS: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
-  paid: { label: 'Pago', color: 'text-green-400 bg-green-500/10 border-green-500/20', icon: <CheckCircle2 className="w-3 h-3" /> },
-  pending: { label: 'Pendente', color: 'text-yellow-400 bg-yellow-500/10 border-yellow-500/20', icon: <Clock className="w-3 h-3" /> },
-  overdue: { label: 'Em Atraso', color: 'text-red-400 bg-red-500/10 border-red-500/20', icon: <AlertCircle className="w-3 h-3" /> },
+  active: { label: 'Pago', color: 'text-green-400 bg-green-500/10 border-green-500/20', icon: <CheckCircle2 className="w-3 h-3" /> },
+  past_due: { label: 'Pendente', color: 'text-yellow-400 bg-yellow-500/10 border-yellow-500/20', icon: <Clock className="w-3 h-3" /> },
+  canceled: { label: 'Cancelado', color: 'text-red-400 bg-red-500/10 border-red-500/20', icon: <AlertCircle className="w-3 h-3" /> },
 };
 
 export default function SuperAdminPage() {
@@ -219,7 +219,7 @@ export default function SuperAdminPage() {
         {[
           { id: 'dashboard', label: 'Visão Geral', icon: <BarChart3 className="w-4 h-4" /> },
           { id: 'stores', label: 'Lojas', icon: <Building2 className="w-4 h-4" /> },
-          { id: 'signups', label: 'Cadastros', icon: <UserPlus className="w-4 h-4" />, badge: stores.filter(s => s.payment_status === 'pending').length },
+          { id: 'signups', label: 'Cadastros', icon: <UserPlus className="w-4 h-4" />, badge: stores.filter(s => s.subscription_status === 'past_due').length },
           { id: 'config', label: 'Sistema', icon: <Settings className="w-4 h-4" /> }
         ].map((tab) => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id as any)}
@@ -454,15 +454,15 @@ export default function SuperAdminPage() {
               <p className="text-stone-500 text-xs mt-1">Gerencie planos, pagamentos e vencimentos das lojas</p>
             </div>
             <div className="flex items-center gap-3 text-xs font-bold">
-              <span className="flex items-center gap-1.5 text-yellow-400"><Clock className="w-3.5 h-3.5" />{stores.filter(s => s.payment_status === 'pending').length} Pendentes</span>
-              <span className="flex items-center gap-1.5 text-green-400"><CheckCircle2 className="w-3.5 h-3.5" />{stores.filter(s => s.payment_status === 'paid').length} Pagos</span>
+              <span className="flex items-center gap-1.5 text-yellow-400"><Clock className="w-3.5 h-3.5" />{stores.filter(s => s.subscription_status === 'past_due').length} Pendentes</span>
+              <span className="flex items-center gap-1.5 text-green-400"><CheckCircle2 className="w-3.5 h-3.5" />{stores.filter(s => s.subscription_status === 'active').length} Pagos</span>
             </div>
           </div>
 
           <div className="space-y-3">
             {stores.map((store) => {
-              const payInfo = PAYMENT_STATUS[store.payment_status || 'pending'] || PAYMENT_STATUS.pending;
-              const expiresAt = store.subscription_expires_at ? new Date(store.subscription_expires_at) : null;
+              const payInfo = PAYMENT_STATUS[store.subscription_status || 'past_due'] || PAYMENT_STATUS.past_due;
+              const expiresAt = store.next_billing_date ? new Date(store.next_billing_date) : null;
               const now = new Date();
               const daysLeft = expiresAt ? Math.ceil((expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : null;
               const isExpiringSoon = daysLeft !== null && daysLeft <= 5 && daysLeft > 0;
@@ -472,7 +472,7 @@ export default function SuperAdminPage() {
                   className={`bg-stone-900/50 border rounded-2xl p-5 space-y-4 ${
                     isExpired ? 'border-red-500/30 bg-red-500/5' : 
                     isExpiringSoon ? 'border-yellow-500/30' : 
-                    store.payment_status === 'pending' ? 'border-yellow-500/20' : 'border-stone-800'
+                    store.subscription_status === 'past_due' ? 'border-yellow-500/20' : 'border-stone-800'
                   }`}>
                   <div className="flex flex-col md:flex-row md:items-center gap-4">
                     {/* Info principal */}
@@ -518,7 +518,7 @@ export default function SuperAdminPage() {
                     </div>
 
                     {/* Ação: Confirmar Pagamento */}
-                    {store.payment_status !== 'paid' && (
+                    {store.subscription_status !== 'active' && (
                       <button
                         onClick={async () => {
                           setUpdatingId(store.id);
@@ -528,10 +528,10 @@ export default function SuperAdminPage() {
                             const res = await fetch(`/api/admin/organizations/${store.id}/payment`, {
                               method: 'PATCH',
                               headers,
-                              body: JSON.stringify({ payment_status: 'paid', subscription_expires_at: nextExpiry.toISOString() })
+                              body: JSON.stringify({ payment_status: 'active', subscription_expires_at: nextExpiry.toISOString() })
                             });
                             if (!res.ok) throw new Error('Erro ao confirmar');
-                            setStores(prev => prev.map(s => s.id === store.id ? { ...s, payment_status: 'paid', subscription_expires_at: nextExpiry.toISOString() } : s));
+                            setStores(prev => prev.map(s => s.id === store.id ? { ...s, subscription_status: 'active', next_billing_date: nextExpiry.toISOString() } : s));
                             showSuccess(`Pagamento de ${store.name} confirmado! +30 dias.`);
                           } catch (e: any) {
                             setError(e.message);
@@ -545,7 +545,7 @@ export default function SuperAdminPage() {
                         Confirmar Pagamento
                       </button>
                     )}
-                    {store.payment_status === 'paid' && (
+                    {store.subscription_status === 'active' && (
                       <button
                         onClick={async () => {
                           setUpdatingId(store.id);
@@ -558,7 +558,7 @@ export default function SuperAdminPage() {
                               body: JSON.stringify({ subscription_expires_at: nextExpiry.toISOString() })
                             });
                             if (!res.ok) throw new Error('Erro ao renovar');
-                            setStores(prev => prev.map(s => s.id === store.id ? { ...s, subscription_expires_at: nextExpiry.toISOString() } : s));
+                            setStores(prev => prev.map(s => s.id === store.id ? { ...s, next_billing_date: nextExpiry.toISOString() } : s));
                             showSuccess(`Assinatura de ${store.name} renovada por +30 dias!`);
                           } catch (e: any) {
                             setError(e.message);

@@ -50,7 +50,7 @@ export default function RegisterPage() {
         const { data: org } = await supabase
           .from('organizations')
           .select('name')
-          .eq('owner_email', session.user.email)
+          .eq('owner_id', session.user.id)
           .limit(1)
           .single();
         if (org?.name) {
@@ -81,13 +81,11 @@ export default function RegisterPage() {
 
     try {
       if (isUpgrade) {
-        if (!session) throw new Error('Sessão expirada. Faça login novamente.');
-        let orgId = urlOrgId || profile?.organization_id;
-
-        if (!orgId && session.user.email) {
+        let orgId = urlOrgId || (profile as any)?.org_id;
+        if (!orgId && session.user.id) {
           try {
             const { data: ownedOrg } = await Promise.race([
-              supabase.from('organizations').select('id').eq('owner_email', session.user.email).limit(1).maybeSingle(),
+              supabase.from('organizations').select('id').eq('owner_id', session.user.id).limit(1).maybeSingle(),
               new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 8000))
             ]) as any;
             if (ownedOrg) orgId = ownedOrg.id;
@@ -124,12 +122,16 @@ export default function RegisterPage() {
           if (!formData.storeName) throw new Error('Informe o nome da sua loja.');
           const slug = formData.storeName.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^\w-]/g, '');
           const { data: newOrg, error: orgErr } = await supabase.from('organizations').insert([{
-            name: formData.storeName, slug, plan: planId, status: 'active', payment_status: 'pending',
-            subscription_expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-            owner_email: session.user.email
+            name: formData.storeName, 
+            slug, 
+            plan: planId, 
+            status: 'active', 
+            subscription_status: 'past_due',
+            next_billing_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+            owner_id: session.user.id
           }]).select().single();
           if (orgErr) throw orgErr;
-          await supabase.from('user_profiles').update({ organization_id: newOrg.id }).eq('id', session.user.id);
+          await supabase.from('profiles').update({ org_id: newOrg.id }).eq('id', session.user.id);
           clearTimeout(watchdog);
           setSuccess(true);
           setTimeout(() => navigate('/vendas'), 2500);
@@ -144,14 +146,18 @@ export default function RegisterPage() {
 
       const slug = formData.storeName.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^\w-]/g, '');
       const { data: orgData, error: orgErr } = await supabase.from('organizations').insert([{
-        name: formData.storeName, slug, plan: planId, status: 'active', payment_status: 'pending',
-        subscription_expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-        owner_email: formData.email, owner_name: formData.fullName
+        name: formData.storeName, 
+        slug, 
+        plan: planId, 
+        status: 'active', 
+        subscription_status: 'past_due',
+        next_billing_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        owner_id: authData.user.id
       }]).select().single();
       if (orgErr) throw orgErr;
 
-      const { error: profErr } = await supabase.from('user_profiles').insert([{
-        id: authData.user.id, organization_id: orgData.id, full_name: formData.fullName, role: 'admin'
+      const { error: profErr } = await supabase.from('profiles').insert([{
+        id: authData.user.id, org_id: orgData.id, name: formData.fullName, role: 'admin'
       }]);
       if (profErr) throw profErr;
 

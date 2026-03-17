@@ -36,10 +36,10 @@ async function getOrganizationFromAuth(authHeader: string | undefined) {
 
     console.log(`[AUTH] Usuário validado: ${user.email} (${user.id}). Buscando perfil...`);
 
-    // 2. Get organization_id from user_profile
+    // 2. Get org_id from profile
     const { data: profile, error: profileError } = await supabase
-      .from('user_profiles')
-      .select('organization_id')
+      .from('profiles')
+      .select('org_id')
       .eq('id', user.id)
       .single();
 
@@ -68,8 +68,8 @@ async function getOrganizationFromAuth(authHeader: string | undefined) {
       throw new Error('Organization context not found.');
     }
 
-    console.log(`[AUTH] Organização identificada: ${profile.organization_id}`);
-    return profile.organization_id;
+    console.log(`[AUTH] Organização identificada: ${profile.org_id}`);
+    return profile.org_id;
   } catch (err: any) {
     console.error('[AUTH] ERRO FATAL:', err.message);
     throw err;
@@ -538,10 +538,13 @@ async function startServer() {
 
   app.get("/api/admin/organizations", requireSuperAdmin, async (req, res) => {
     try {
-      // 1. Get all organizations
+      // 1. Get all organizations with owner info
       const { data: orgs, error: orgsError } = await supabase
         .from('organizations')
-        .select('*')
+        .select(`
+          *,
+          profiles:profiles!inner(email, name)
+        `)
         .order('created_at', { ascending: false });
       
       if (orgsError) throw orgsError;
@@ -554,13 +557,17 @@ async function startServer() {
 
       if (statsError) throw statsError;
 
-      // 3. Map orders to organizations
-      const mappedOrgs = orgs.map(org => {
+      // 3. Map orders to organizations and flatten owner info
+      const mappedOrgs = orgs.map((org: any) => {
         const orgOrders = orderStats.filter(o => o.organization_id === org.id);
+        const ownerProfile = Array.isArray(org.profiles) ? org.profiles[0] : org.profiles;
+        
         return {
           ...org,
+          owner_email: ownerProfile?.email,
+          owner_name: ownerProfile?.name,
           total_orders: orgOrders.length,
-          total_sales: orgOrders.reduce((acc, curr) => acc + (curr.total_price || 0), 0)
+          total_sales: orgOrders.reduce((acc: number, curr: any) => acc + (curr.total_price || 0), 0)
         };
       });
 
@@ -635,7 +642,7 @@ async function startServer() {
       const orgId = await getOrganizationFromAuth(req.headers.authorization);
       const { data, error } = await supabase
         .from('organizations')
-        .select('id, name, plan, status, payment_status, subscription_expires_at, created_at, owner_email')
+        .select('id, name, plan, status, subscription_status, next_billing_date, created_at')
         .eq('id', orgId)
         .single();
       if (error) throw error;
@@ -674,8 +681,8 @@ async function startServer() {
         .from('organizations')
         .update({ 
           plan: planId, 
-          payment_status: 'pending',
-          subscription_expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+          subscription_status: 'past_due', // Marcando como pendente de pagamento
+          next_billing_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
         })
         .eq('id', orgId)
         .select()
@@ -699,14 +706,16 @@ async function startServer() {
     }
   });
 
-  // Confirm payment for a store (Super Admin)
-  app.patch("/api/admin/organizations/:id/payment", requireSuperAdmin, async (req, res) => {
+   app.patch("/api/admin/organizations/:id/payment", requireSuperAdmin, async (req, res) => {
     try {
       const { payment_status, subscription_expires_at } = req.body;
       const updates: any = {};
-      if (payment_status) updates.payment_status = payment_status;
-      if (subscription_expires_at) updates.subscription_expires_at = subscription_expires_at;
-      // If confirming payment, also set plan to active
+      
+      // Mapeamento de campos para o novo esquema
+      if (payment_status) updates.subscription_status = payment_status; // 'paid', 'past_due', etc.
+      if (subscription_expires_at) updates.next_billing_date = subscription_expires_at;
+      
+      // If confirming payment, also set status to active
       if (payment_status === 'paid') updates.status = 'active';
 
       const { error } = await supabase

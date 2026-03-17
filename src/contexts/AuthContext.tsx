@@ -4,8 +4,11 @@ import { Session, User } from '@supabase/supabase-js';
 
 interface UserProfile {
   id: string;
-  organization_id: string;
+  org_id: string;
+  organization_id?: string; // Virtual para compatibilidade
   full_name: string | null;
+  name?: string | null; // Real campo do banco
+  organization_name?: string; // Virtual
   organizations?: {
     name: string;
   } | { name: string }[];
@@ -75,7 +78,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     console.log('AuthContext: Fetching profile for:', userId);
     try {
       const { data, error } = await supabase
-        .from('user_profiles')
+        .from('profiles')
         .select('*, organizations(name)')
         .eq('id', userId)
         .single();
@@ -87,20 +90,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           console.error('AuthContext: Error fetching profile:', error);
         }
       } else {
-        console.log('AuthContext: Profile loaded', data);
-        // Garantir que organizations.name seja acessível mesmo se retornar como array
-        if (data && data.organizations && Array.isArray(data.organizations)) {
-          data.organization_name = data.organizations[0]?.name;
-        } else if (data && data.organizations) {
-          data.organization_name = data.organizations.name;
-        }
+        if (data) {
+          // Mapeia os nomes reais para os nomes esperados pelo resto da aplicação
+          data.organization_id = data.org_id;
+          data.full_name = data.name;
 
-        // Blindagem contra nomes incorretos ou obsoletos
-        if (data.organization_id === '9b1462c0-d902-4fdc-9542-7a92f6c28402' || data.organization_id === 'ba2087fe-0498-43f4-93dc-bdf9f2f1ce66') {
-           data.organization_name = 'tem de tudo';
-        }
+          // Garantir que organizations.name seja acessível mesmo se retornar como array
+          if (data.organizations && Array.isArray(data.organizations)) {
+            data.organization_name = data.organizations[0]?.name;
+          } else if (data.organizations) {
+            data.organization_name = (data.organizations as any).name;
+          }
 
-        setProfile(data);
+          // Blindagem contra nomes incorretos ou obsoletos
+          if (data.org_id === '9b1462c0-d902-4fdc-9542-7a92f6c28402' || data.org_id === 'ba2087fe-0498-43f4-93dc-bdf9f2f1ce66') {
+             data.organization_name = 'tem de tudo';
+          }
+
+          setProfile(data);
+        }
       }
     } catch (err: any) {
       if (err.name !== 'AbortError') {
