@@ -62,19 +62,19 @@ async function getOrganizationFromAuth(authHeader: string | undefined) {
       const { data: mainOrg } = await supabase
         .from('organizations')
         .select('id')
-        .or('slug.eq.tem-de-tudo,name.ilike.%tem de tudo%,slug.ilike.%tem-de-tudo%')
+        .or('slug.eq.crep-na-chapa,name.ilike.%crep%,slug.ilike.%crep-na-chapa%')
         .limit(1)
         .maybeSingle();
       if (mainOrg?.id) {
-        console.log(`[AUTH] Org admin encontrada (Tem de tudo): ${mainOrg.id}`);
+        console.log(`[AUTH] Org admin encontrada (Crep na Chapa - Produtos Reais): ${mainOrg.id}`);
         return mainOrg.id;
       }
       
-      // Fallback 3.1: Qualquer outra org se Tem de Tudo não existir
+      // Fallback 3.1: Qualquer outra org se Crep na Chapa não existir
       const { data: anyOrg } = await supabase
         .from('organizations')
         .select('id')
-        .order('created_at', { ascending: false }) // Pega a mais recente
+        .order('created_at', { ascending: true }) // A mais antiga, que é a original
         .limit(1)
         .maybeSingle();
       if (anyOrg?.id) {

@@ -1,0 +1,122 @@
+[
+  {
+    "id": 9,
+    "name": "Calabresa ",
+    "type": "crepe",
+    "price": 15,
+    "ingredients": [
+      "Queijo",
+      "Calabresa",
+      "Milho",
+      "Batata palha",
+      "Catupiri",
+      "Oregano"
+    ],
+    "organization_id": "ba2087fe-0498-43f4-93dc-bdf9f2f1ce66"
+  },
+  {
+    "id": 10,
+    "name": "Bacon",
+    "type": "crepe",
+    "price": 15,
+    "ingredients": [
+      "Queijo",
+      "Bacon",
+      "Milho",
+      "Batata palha",
+      "Catupiry"
+    ],
+    "organization_id": "ba2087fe-0498-43f4-93dc-bdf9f2f1ce66"
+  },
+  {
+    "id": 11,
+    "name": "Frango ",
+    "type": "crepe",
+    "price": 15,
+    "ingredients": [
+      "Queijo",
+      "Frango desfiado",
+      "Batata palha",
+      "Milho",
+      "Catupiry",
+      "Oregano"
+    ],
+    "organization_id": "ba2087fe-0498-43f4-93dc-bdf9f2f1ce66"
+  },
+  {
+    "id": 12,
+    "name": "A moda casa",
+    "type": "crepe",
+    "price": 20,
+    "ingredients": [
+      "Queijo",
+      "Frango desfiado",
+      "Calabresa",
+      "Presunto",
+      "Milho",
+      "Batata palha",
+      "Catupiry",
+      "Oregano"
+    ],
+    "organization_id": "ba2087fe-0498-43f4-93dc-bdf9f2f1ce66"
+  },
+  {
+    "id": 13,
+    "name": "Presunto ",
+    "type": "crepe",
+    "price": 15,
+    "ingredients": [
+      "Queijo",
+      "Presunto",
+      "Milho",
+      "Batata palha",
+      "Catupiry",
+      "Orégano"
+    ],
+    "organization_id": "ba2087fe-0498-43f4-93dc-bdf9f2f1ce66"
+  },
+  {
+    "id": 14,
+    "name": "Tem de Tudo ",
+    "type": "crepe",
+    "price": 25,
+    "ingredients": [
+      "Queijo",
+      "Frango desfiado",
+      "Calabresa",
+      "Presunto",
+      "Bacon",
+      "Carne seca",
+      "Milho",
+      "Batata palha",
+      "Catupiry",
+      "Orégano"
+    ],
+    "organization_id": "ba2087fe-0498-43f4-93dc-bdf9f2f1ce66"
+  },
+  {
+    "id": 15,
+    "name": "Carne seca",
+    "type": "crepe",
+    "price": 15,
+    "ingredients": [
+      "Queijo",
+      "Carne seca",
+      "Milho",
+      "Batata palha",
+      "Catupiry",
+      "Orégano"
+    ],
+    "organization_id": "ba2087fe-0498-43f4-93dc-bdf9f2f1ce66"
+  },
+  {
+    "id": 17,
+    "name": "coca cola de 350 ml",
+    "type": "crepe",
+    "price": 5,
+    "ingredients": [
+      "coca cola"
+    ],
+    "organization_id": "ba2087fe-0498-43f4-93dc-bdf9f2f1ce66"
+  }
+]

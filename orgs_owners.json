@@ -1,0 +1,16 @@
+[
+  {
+    "id": "ba2087fe-0498-43f4-93dc-bdf9f2f1ce66",
+    "name": "Crep na Chapa",
+    "slug": "crep-na-chapa",
+    "owner_email": null,
+    "plan": "pro"
+  },
+  {
+    "id": "9b1462c0-d902-4fdc-9542-7a92f6c28402",
+    "name": "tem de tudo",
+    "slug": "tem-de-tudo",
+    "owner_email": "superadmin@gmail.com",
+    "plan": "profissional"
+  }
+]
