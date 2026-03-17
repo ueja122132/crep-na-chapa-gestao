@@ -17,19 +17,24 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Utility to resolve organization from Auth Header
 async function getOrganizationFromAuth(authHeader: string | undefined) {
+  console.log('[AUTH] Analisando header de autorização...');
   try {
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      console.warn('[AUTH] Header ausente ou inválido');
       throw new Error('Missing or invalid Authorization header');
     }
 
     const token = authHeader.split(' ')[1];
+    console.log('[AUTH] Token extraído. Verificando usuário no Supabase...');
     
     // 1. Get user from token
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     if (authError || !user) {
-      console.error('Auth error resolving user:', authError);
+      console.error('[AUTH] Erro ao validar token:', authError);
       throw new Error('Unauthorized');
     }
+
+    console.log(`[AUTH] Usuário validado: ${user.email} (${user.id}). Buscando perfil...`);
 
     // 2. Get organization_id from user_profile
     const { data: profile, error: profileError } = await supabase
@@ -39,35 +44,34 @@ async function getOrganizationFromAuth(authHeader: string | undefined) {
       .single();
 
     if (profileError || !profile) {
-      console.warn(`Profile not found for user ${user.id} (${user.email}). Attempting fallback.`);
+      console.warn(`[AUTH] Perfil não encontrado para ${user.email}. Tentando fallbacks...`);
       
-      // Fallback 1: Check if user email belongs to known admin list
       const adminEmails = ['superadmin@gmail.com'];
       const isAdmin = adminEmails.includes(user.email || '');
 
       if (isAdmin) {
+         console.log(`[AUTH] Admin bypass para ${user.email}. Buscando org principal...`);
          const { data: mainOrg } = await supabase.from('organizations').select('id').eq('slug', 'tem-de-tudo').single();
          if (mainOrg) {
-           console.log(`Fallback successful: Mapping admin ${user.email} to tem-de-tudo organization.`);
+           console.log(`[AUTH] Fallback bem-sucedido: Org ${mainOrg.id}`);
            return mainOrg.id;
          }
       }
 
-      // Fallback 2: If there's only one organization in the whole system (bootstrap phase)
+      console.log('[AUTH] Tentando fallback de organização única...');
       const { data: orgs } = await supabase.from('organizations').select('id');
       if (orgs && orgs.length === 1) {
-        console.log('Single organization detected. Defaulting context.');
+        console.log('[AUTH] Organização única detectada.');
         return orgs[0].id;
       }
       
-      const errorMsg = 'Organization context not found. Please complete your registration or contact support.';
-      console.error(errorMsg);
-      throw new Error(errorMsg);
+      throw new Error('Organization context not found.');
     }
 
+    console.log(`[AUTH] Organização identificada: ${profile.organization_id}`);
     return profile.organization_id;
   } catch (err: any) {
-    console.error('Critical error in getOrganizationFromAuth:', err.message);
+    console.error('[AUTH] ERRO FATAL:', err.message);
     throw err;
   }
 }
@@ -643,12 +647,16 @@ async function startServer() {
 
   // Change plan for logged-in store
   app.post("/api/subscription/change-plan", async (req, res) => {
+    console.log('[API] Recebida requisição de troca de plano');
     try {
       const { planId } = req.body;
-      if (!planId) return res.status(400).json({ error: 'Missing planId' });
+      if (!planId) {
+        console.warn('[API] planId ausente');
+        return res.status(400).json({ error: 'Missing planId' });
+      }
 
       const orgId = await getOrganizationFromAuth(req.headers.authorization);
-      console.log(`[API] Server-side upgrade requested: Org ${orgId} -> ${planId}`);
+      console.log(`[API] Processando upgrade: Org ${orgId} -> ${planId}`);
 
       const { data, error } = await supabase
         .from('organizations')
@@ -661,11 +669,15 @@ async function startServer() {
         .select()
         .single();
 
-      if (error) throw error;
-      console.log(`[API] Upgrade successful for Org ${orgId}`);
+      if (error) {
+        console.error('[API] Erro no update Supabase:', error);
+        throw error;
+      }
+      
+      console.log(`[API] Upgrade finalizado com sucesso para Org ${orgId}`);
       res.json(data);
     } catch (err: any) {
-      console.error('[API] Change plan error:', err.message);
+      console.error('[API] ERRO NO CHANGE-PLAN:', err.message);
       res.status(500).json({ error: err.message });
     }
   });
