@@ -641,6 +641,35 @@ async function startServer() {
     }
   });
 
+  // Change plan for logged-in store
+  app.post("/api/subscription/change-plan", async (req, res) => {
+    try {
+      const { planId } = req.body;
+      if (!planId) return res.status(400).json({ error: 'Missing planId' });
+
+      const orgId = await getOrganizationFromAuth(req.headers.authorization);
+      console.log(`[API] Server-side upgrade requested: Org ${orgId} -> ${planId}`);
+
+      const { data, error } = await supabase
+        .from('organizations')
+        .update({ 
+          plan: planId, 
+          payment_status: 'pending',
+          subscription_expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+        })
+        .eq('id', orgId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      console.log(`[API] Upgrade successful for Org ${orgId}`);
+      res.json(data);
+    } catch (err: any) {
+      console.error('[API] Change plan error:', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // Confirm payment for a store (Super Admin)
   app.patch("/api/admin/organizations/:id/payment", requireSuperAdmin, async (req, res) => {
     try {
