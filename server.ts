@@ -644,6 +644,39 @@ async function startServer() {
     }
   });
 
+  // =============================================
+  // PAGAMENTO SIMULADO DO WIDGET
+  // =============================================
+  app.post("/api/simulate-payment", async (req, res) => {
+    try {
+      const authHeader = req.headers.authorization;
+      if (!authHeader?.startsWith('Bearer ')) {
+        return res.status(401).json({ error: 'Token não fornecido' });
+      }
+      
+      const orgId = await getOrganizationFromAuth(authHeader);
+      if (!orgId) return res.status(404).json({ error: 'Organização não encontrada.' });
+
+      const nextBilling = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+      
+      const { error: updateErr } = await supabase
+        .from('organizations')
+        .update({
+          payment_status: 'paid',
+          status: 'active',
+          subscription_expires_at: nextBilling
+        })
+        .eq('id', orgId);
+
+      if (updateErr) throw updateErr;
+
+      res.json({ success: true, message: 'Pagamento atualizado com sucesso' });
+    } catch (err: any) {
+      console.error('[SIMULATE-PAYMENT] Erro:', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // Subscription info for logged-in store
   app.get("/api/subscription", async (req, res) => {
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');

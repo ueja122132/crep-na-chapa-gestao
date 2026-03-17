@@ -48,7 +48,7 @@ export default function SubscriptionWidget() {
   useEffect(() => {
     const fetchSub = async () => {
       try {
-        const res = await fetch('/api/subscription', {
+        const res = await fetch(`/api/subscription?t=${Date.now()}`, {
           headers: { Authorization: `Bearer ${session?.access_token}` }
         });
         if (res.ok) {
@@ -73,16 +73,18 @@ export default function SubscriptionWidget() {
       const nextExpiry = new Date();
       nextExpiry.setDate(nextExpiry.getDate() + 30);
       
-      // Chamada pra confirmar o pagamento do lado do cliente (simulando webhook/admin)
-      // Em produção, a RLS do Supabase deve ser verificada para essa chamada.
-      const res = await fetch(`/api/admin/config`, { // Using dummy endpoint temporarily or we could just update local state
+      // Chamada para confirmar o pagamento do lado do servidor (persistindo REALMENTE na tabela organizations)
+      const res = await fetch(`/api/simulate-payment`, { 
         method: 'POST',
         headers: { 
           Authorization: `Bearer ${session?.access_token}`,
           'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ key: 'last_payment_' + data?.name, value: new Date().toISOString() })
+        }
       });
+      
+      if (!res.ok) {
+        throw new Error('Falha ao simular pagamento no servidor');
+      }
       
       // Atualizar o frontend imediatamente para experiência fluida
       setData(prev => ({ 
@@ -94,6 +96,7 @@ export default function SubscriptionWidget() {
       setShowPixPay(false);
     } catch (e) {
       console.error(e);
+      alert('Erro ao processar pagamento simulado. Tente novamente.');
     } finally {
       setIsProcessing(false);
     }
