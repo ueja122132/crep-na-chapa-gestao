@@ -653,8 +653,7 @@ async function startServer() {
   });
 
   // =============================================
-  // NOVO ENDPOINT: Upgrade de Plano (Simplificado)
-  // Usa owner_email da org para localizar sem depender de user_profiles
+  // NOVO ENDPOINT: Upgrade de Plano (Multi-Estratégia)
   // =============================================
   app.post("/api/upgrade-plan", async (req, res) => {
     console.log('[UPGRADE-PLAN] Requisição recebida');
@@ -669,7 +668,6 @@ async function startServer() {
         return res.status(401).json({ error: 'Token não fornecido' });
       }
 
-      // 1. Validar token e obter email do usuário
       const token = authHeader.split(' ')[1];
       const { data: { user }, error: authErr } = await supabase.auth.getUser(token);
       if (authErr || !user?.email) {
@@ -683,35 +681,63 @@ async function startServer() {
         return res.status(400).json({ error: 'planId é obrigatório' });
       }
 
-      console.log(`[UPGRADE-PLAN] User: ${user.email} | Plano: ${planId}`);
+      console.log(`[UPGRADE-PLAN] User: ${user.email} (${user.id}) | Plano: ${planId}`);
 
-      // 2. Buscar organização pelo email do dono (owner_email)
-      const { data: org, error: orgErr } = await supabase
+      let orgId: string | null = null;
+
+      // Estratégia 1: owner_email direto na tabela organizations
+      const { data: orgByEmail } = await supabase
         .from('organizations')
-        .select('id, name, plan')
+        .select('id')
         .eq('owner_email', user.email)
         .limit(1)
         .maybeSingle();
+      if (orgByEmail?.id) {
+        orgId = orgByEmail.id;
+        console.log(`[UPGRADE-PLAN] Estratégia 1 (owner_email): ${orgId}`);
+      }
 
-      // Fallback: se owner_email não retornar, buscar via user_profiles
-      let orgId = org?.id;
+      // Estratégia 2: user_profiles.organization_id
       if (!orgId) {
-        console.log('[UPGRADE-PLAN] Fallback: buscando via user_profiles...');
         const { data: profile } = await supabase
           .from('user_profiles')
           .select('organization_id')
           .eq('id', user.id)
           .maybeSingle();
-        orgId = profile?.organization_id;
+        if (profile?.organization_id) {
+          orgId = profile.organization_id;
+          console.log(`[UPGRADE-PLAN] Estratégia 2 (user_profiles): ${orgId}`);
+        }
+      }
+
+      // Estratégia 3: Se for superadmin, pegar a organização pela slug 'tem-de-tudo'
+      if (!orgId) {
+        const { data: profile } = await supabase
+          .from('user_profiles')
+          .select('role')
+          .eq('id', user.id)
+          .maybeSingle();
+        
+        if (profile?.role === 'super_admin' || profile?.role === 'admin') {
+          const { data: mainOrg } = await supabase
+            .from('organizations')
+            .select('id')
+            .limit(1)
+            .maybeSingle();
+          if (mainOrg?.id) {
+            orgId = mainOrg.id;
+            console.log(`[UPGRADE-PLAN] Estratégia 3 (admin/única org): ${orgId}`);
+          }
+        }
       }
 
       if (!orgId) {
         clearTimeout(timeout);
-        console.error(`[UPGRADE-PLAN] Org não encontrada para ${user.email}`);
-        return res.status(404).json({ error: 'Organização não encontrada para este usuário' });
+        console.error(`[UPGRADE-PLAN] Nenhuma org encontrada para ${user.email}`);
+        return res.status(404).json({ error: `Organização não encontrada. Email: ${user.email}` });
       }
 
-      // 3. Atualizar o plano com service role (sem restrições de RLS)
+      // Atualizar o plano
       const nextBilling = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
       const { data: updated, error: updateErr } = await supabase
         .from('organizations')
