@@ -118,51 +118,6 @@ async function startServer() {
 
   // API Routes
 
-  // Settings
-  app.get('/api/settings', async (req, res) => {
-    try {
-      const orgId = await getOrganizationFromAuth(req.headers.authorization);
-      const { data, error } = await supabase
-        .from('settings')
-        .select('*')
-        .eq('organization_id', orgId);
-
-      const defaultSettings = [
-        { key: 'extra_ingredient_price', value: '5.00' }
-      ];
-
-      if (error || !data || data.length === 0) {
-        return res.json(defaultSettings);
-      }
-
-      res.json(data);
-    } catch (error) {
-      res.json([{ key: 'extra_ingredient_price', value: '5.00' }]);
-    }
-  });
-
-  app.post('/api/settings', async (req, res) => {
-    try {
-      const orgId = await getOrganizationFromAuth(req.headers.authorization);
-      const { key, value } = req.body;
-
-      const { error } = await supabase
-        .from('settings')
-        .upsert({
-          organization_id: orgId,
-          key,
-          value,
-          updated_at: new Date().toISOString()
-        }, { onConflict: 'organization_id, key' });
-
-      if (error) throw error;
-      res.json({ success: true });
-    } catch (error: any) {
-      console.error('Error saving settings:', error);
-      res.status(500).json({ error: 'Erro ao salvar configurações.' });
-    }
-  });
-
   // Products (Menu)
   app.get("/api/products", async (req, res) => {
     try {
