@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Clock, CheckCircle2, ChefHat, User, ClipboardList, Timer, DollarSign, Edit2, Plus, Trash2, Banknote, CreditCard, QrCode, X } from 'lucide-react';
 import { Order, Product } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
@@ -16,7 +16,7 @@ export default function KitchenDisplay() {
   const { session } = useAuth();
 
   // Ref para controlar a frequência de carregamento e evitar spam de bipes
-  const lastFetchTime = React.useRef(0);
+  const lastFetchTime = useRef(0);
   
   useEffect(() => {
     if (!session) return;
