@@ -15,33 +15,62 @@ export default function KitchenDisplay() {
   const [extraIngredients, setExtraIngredients] = useState<string[]>([]);
   const { session } = useAuth();
 
+  // Ref para controlar a frequência de carregamento e evitar spam de bipes
+  const lastFetchTime = React.useRef(0);
+  
   useEffect(() => {
     if (!session) return;
     
     fetchOrders();
     fetchProducts();
 
-    // Subscribe to changes in the 'orders' table
+    // Função para tocar um bipe discreto de novo pedido
+    const playOrderSound = () => {
+      try {
+        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(880, audioContext.currentTime);
+        gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+        oscillator.start();
+        oscillator.stop(audioContext.currentTime + 0.1);
+      } catch (e) {
+        console.warn('Áudio não iniciado (requer interação do usuário)');
+      }
+    };
+
+    // Canal de pedidos com debounce simples e som
     const ordersChannel = supabase
-      .channel('kitchen-orders')
+      .channel('kitchen-orders-realtime')
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'orders' },
+        { event: 'INSERT', schema: 'public', table: 'orders' },
         () => {
-          fetchOrders();
+          const now = Date.now();
+          if (now - lastFetchTime.current > 2000) {
+            playOrderSound();
+            fetchOrders();
+            lastFetchTime.current = now;
+          }
         }
+      )
+      .on(
+         'postgres_changes',
+         { event: 'UPDATE', schema: 'public', table: 'orders' },
+         () => fetchOrders()
       )
       .subscribe();
 
-    // Also subscribe to order_items for real-time item updates
+    // Canal de itens para atualizações de customização
     const itemsChannel = supabase
-      .channel('kitchen-items')
+      .channel('kitchen-items-realtime')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'order_items' },
-        () => {
-          fetchOrders();
-        }
+        () => fetchOrders()
       )
       .subscribe();
 

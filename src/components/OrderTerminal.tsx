@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo } from 'react';
 import { Plus, Minus, ShoppingCart, User, CheckCircle2, X, CreditCard, Banknote, QrCode, Clock } from 'lucide-react';
 import { Product, OrderItem } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
@@ -26,6 +26,28 @@ export default function OrderTerminal() {
       fetchSettings();
     }
   }, [session]);
+
+  // Memoize para evitar que o grid inteiro de produtos pisque ao mexer no carrinho
+  const ProductGrid = memo(({ products, onOpen }: { products: Product[], onOpen: (p: Product) => void }) => (
+    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+      {products.map((product) => (
+        <button
+          key={product.id}
+          onClick={() => onOpen(product)}
+          className="bg-white p-4 rounded-2xl border border-stone-200 shadow-sm hover:border-orange-500 hover:shadow-md transition-all text-left group"
+        >
+          <div className={`w-10 h-10 rounded-xl mb-3 flex items-center justify-center ${
+            product.type === 'crepe' ? 'bg-amber-100 text-amber-600' : 'bg-red-100 text-red-600'
+          }`}>
+            <span className="font-bold text-lg">{product.name[0]}</span>
+          </div>
+          <h3 className="font-bold text-stone-800 group-hover:text-orange-600 transition-colors">{product.name}</h3>
+          <p className="text-xs text-stone-400 mb-2 uppercase tracking-wider">{product.type}</p>
+          <p className="text-orange-600 font-bold">R$ {product.price.toFixed(2)}</p>
+        </button>
+      ))}
+    </div>
+  ));
 
   const fetchSettings = async () => {
     try {
@@ -194,24 +216,7 @@ export default function OrderTerminal() {
           </AnimatePresence>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-          {products.map((product) => (
-            <button
-              key={product.id}
-              onClick={() => openCustomizer(product)}
-              className="bg-white p-4 rounded-2xl border border-stone-200 shadow-sm hover:border-orange-500 hover:shadow-md transition-all text-left group"
-            >
-              <div className={`w-10 h-10 rounded-xl mb-3 flex items-center justify-center ${
-                product.type === 'crepe' ? 'bg-amber-100 text-amber-600' : 'bg-red-100 text-red-600'
-              }`}>
-                <span className="font-bold text-lg">{product.name[0]}</span>
-              </div>
-              <h3 className="font-bold text-stone-800 group-hover:text-orange-600 transition-colors">{product.name}</h3>
-              <p className="text-xs text-stone-400 mb-2 uppercase tracking-wider">{product.type}</p>
-              <p className="text-orange-600 font-bold">R$ {product.price.toFixed(2)}</p>
-            </button>
-          ))}
-        </div>
+        <ProductGrid products={products} onOpen={openCustomizer} />
       </div>
 
       {/* Cart / Checkout */}
