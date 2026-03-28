@@ -17,6 +17,7 @@ export default function OrderTerminal() {
   const [extraIngredients, setExtraIngredients] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [extraPrice, setExtraPrice] = useState(5.0);
+  const [showSuccess, setShowSuccess] = useState(false);
   const { session } = useAuth();
 
   useEffect(() => {
@@ -38,7 +39,7 @@ export default function OrderTerminal() {
       if (!Array.isArray(data)) return;
       const priceSetting = data.find((s: any) => s.key === 'extra_ingredient_price');
       if (priceSetting) {
-        setExtraPrice(parseFloat(priceSetting.value));
+        setExtraPrice(Number(priceSetting.value) || 0);
       }
     } catch (error) {
       console.error('Error fetching settings:', error);
@@ -58,7 +59,12 @@ export default function OrderTerminal() {
       if (!res.ok) throw new Error('Failed to fetch products');
       const data = await res.json();
       if (Array.isArray(data)) {
-        setProducts(data);
+        // Garantir que o preço seja um número para evitar erros de soma
+        const formattedData = data.map((p: any) => ({
+          ...p,
+          price: Number(p.price) || 0
+        }));
+        setProducts(formattedData);
       }
     } catch (err) {
       console.error('Error fetching products:', err);
@@ -134,11 +140,11 @@ export default function OrderTerminal() {
         },
         body: JSON.stringify({
           customer_name: customerName || 'Cliente Balcão',
-          total_price: total,
-          items: cart,
+          total_price: Number(total),
+          items: cart.map(item => ({ ...item, price: Number(item.price) })),
           payment_status: paymentStatus,
           payment_method: paymentStatus === 'paid' ? paymentMethod : null,
-          amount_received: paymentStatus === 'paid' && paymentMethod === 'dinheiro' && amountReceived ? parseFloat(amountReceived) : null
+          amount_received: paymentStatus === 'paid' && paymentMethod === 'dinheiro' && amountReceived ? Number(amountReceived.replace(',', '.')) : null
         })
       });
 
@@ -146,8 +152,15 @@ export default function OrderTerminal() {
       setCustomerName('');
       setPaymentStatus('paid');
       setPaymentMethod('pix');
+      setPaymentMethod('pix');
       setAmountReceived('');
-      alert('Pedido enviado para a cozinha!');
+      
+      // Feedback visual em vez de alert travando
+      setShowSuccess(true);
+      setTimeout(() => setShowSuccess(false), 3000);
+      
+      // Rolar de volta para o cardápio no celular
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (error) {
       console.error('Erro ao finalizar pedido:', error);
       alert('Erro ao enviar o pedido. Tente novamente.');
@@ -160,9 +173,25 @@ export default function OrderTerminal() {
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
       {/* Products Grid */}
       <div className="lg:col-span-2">
-        <div className="mb-6">
-          <h2 className="text-2xl font-bold text-stone-800 mb-2">Novo Pedido</h2>
-          <p className="text-stone-500">Selecione os itens para montar o pedido</p>
+        <div className="mb-6 flex justify-between items-end">
+          <div>
+            <h2 className="text-2xl font-bold text-stone-800 mb-2">Novo Pedido</h2>
+            <p className="text-stone-500">Selecione os itens para montar o pedido</p>
+          </div>
+          
+          <AnimatePresence>
+            {showSuccess && (
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 20 }}
+                className="bg-emerald-500 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-lg shadow-emerald-200 flex items-center gap-2"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                PEDIDO ENVIADO!
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">

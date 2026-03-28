@@ -62,7 +62,15 @@ export default function KitchenDisplay() {
       if (!res.ok) throw new Error('Failed to fetch orders');
       const data = await res.json();
       if (Array.isArray(data)) {
-        setOrders(data);
+        const formattedOrders = data.map((order: any) => ({
+          ...order,
+          total_price: Number(order.total_price) || 0,
+          items: (order.items || []).map((item: any) => ({
+            ...item,
+            price: Number(item.price) || 0
+          }))
+        }));
+        setOrders(formattedOrders);
       }
     } catch (err) {
       console.error('Error fetching orders:', err);
@@ -79,7 +87,10 @@ export default function KitchenDisplay() {
       if (!res.ok) throw new Error('Failed to fetch products');
       const data = await res.json();
       if (Array.isArray(data)) {
-        setProducts(data);
+        setProducts(data.map((p: any) => ({
+          ...p,
+          price: Number(p.price) || 0
+        })));
       }
     } catch (err) {
       console.error('Error fetching products:', err);
@@ -109,7 +120,7 @@ export default function KitchenDisplay() {
       body: JSON.stringify({ 
         payment_status: 'paid',
         payment_method: paymentMethod,
-        amount_received: paymentMethod === 'dinheiro' && amountReceived ? parseFloat(amountReceived) : null
+        amount_received: paymentMethod === 'dinheiro' && amountReceived ? Number(amountReceived.replace(',', '.')) : null
       })
     });
     setPayingOrder(null);
